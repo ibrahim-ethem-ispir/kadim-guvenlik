@@ -12,6 +12,7 @@ Bu testler zamanlama-karar çekirdeğini pinler (I/O değil — saf, jitter'a da
 import asyncio
 import os
 import sys
+import time
 
 import httpx
 
@@ -25,7 +26,9 @@ from pipeline.verification import (
     detect_sqli_error_signature, confirm_boolean_sqli,
     extract_sqli_error_value, parse_union_extracted,
     verify_error_based_sqli, verify_union_extraction,
+    verify_ssti, verify_rce, verify_blind_rce,
 )
+from pipeline.oast_client import OastClient
 from pipeline.attack_hypothesis import VERIFIABLE_CLASSES
 
 
@@ -399,6 +402,112 @@ def test_verify_union_extraction_no_marker_not_confirmed():
     asyncio.run(client.aclose())
 
 
+# ---- SSTI merdiveni + kör komut kanıtı (derin doğrulama) ----
+
+def _ssti_mock_handler(allow_rce_echo: bool):
+    """SSTI merdiveni sahte-ucu: aritmetik (asal çarpım), motor parmak izi (7*'7'),
+    ve (açıkça izinliyse) RCE echo marker'ı — hepsi türetilmiş/imzalı yanıtlar."""
+    import re as _re
+    from urllib.parse import unquote_plus
+
+    def handler(request):
+        u = unquote_plus(str(request.url))
+        mm = _re.search(r"\{\{(\d+)\*(\d+)\}\}", u)
+        if mm:
+            return httpx.Response(200, text=f"<p>{int(mm.group(1)) * int(mm.group(2))}</p>")
+        if "7*'7'" in u:
+            return httpx.Response(200, text="<p>7777777</p>")
+        rm = _re.search(r"echo (Kad1mRce[0-9a-f]+)", u)
+        if rm and allow_rce_echo:
+            return httpx.Response(200, text=f"<p>{rm.group(1)}</p>")
+        return httpx.Response(200, text="<p>merhaba</p>")
+
+    return handler
+
+
+def test_ssti_ladder_full_depth_to_rce():
+    """Aritmetik → motor parmak izi → RCE echo: merdiven EN DERİN basamağa yükselir."""
+    client = httpx.AsyncClient(transport=httpx.MockTransport(_ssti_mock_handler(True)))
+    v = asyncio.run(verify_ssti("https://h.test/v?q=abc", "q", client))
+    assert v.verified is True
+    assert v.method == "ssti-rce-echo"
+    assert "RCE basamağı" in v.detail and "echo Kad1mRce" in v.detail
+    assert v.severity == "critical"
+    assert "HESAPLANMIŞ" in v.detail            # aritmetik teyit kaybolmadı
+    asyncio.run(client.aclose())
+
+
+def test_ssti_ladder_context_read_without_rce():
+    """RCE basamağı tutmazsa motor/nesne basamağının kanıtı KALIR (aritmetik de korunur)."""
+    client = httpx.AsyncClient(transport=httpx.MockTransport(_ssti_mock_handler(False)))
+    v = asyncio.run(verify_ssti("https://h.test/v?q=abc", "q", client))
+    assert v.verified is True
+    assert v.method == "ssti-context-read"
+    assert "motor parmak izi" in v.detail
+    asyncio.run(client.aclose())
+
+
+def test_verify_rce_echo_inband_still_wins():
+    """In-band echo marker'ı yansıyorsa kanıt 'rce-echo' kalır — derinlik basamakları
+    GEREKSİZ yere koşturulmaz (istek ekonomisi)."""
+    import re as _re
+    from urllib.parse import unquote_plus
+
+    def handler(request):
+        u = unquote_plus(str(request.url))
+        rm = _re.search(r"echo (Kad1mRce[0-9a-f]+)", u)
+        if rm:
+            return httpx.Response(200, text=f"<p>{rm.group(1)}</p>")
+        return httpx.Response(200, text="<p>ok</p>")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    v = asyncio.run(verify_rce("https://h.test/run?cmd=id", None, client))
+    assert v.verified is True and v.method == "rce-echo"
+    asyncio.run(client.aclose())
+
+
+def test_verify_rce_oast_mock_confirmed():
+    """Echo yankılanmayan yüzeyde OAST geri araması (nslookup/curl) KÖR komut kanıtı üretir."""
+    from urllib.parse import unquote_plus
+    oast = OastClient(session_id="t-oast", oast_domain="oast.kadim.test", mock_mode=True)
+
+    def handler(request):
+        u = unquote_plus(str(request.url))
+        for tok, data in oast.registered_tokens.items():
+            if data["fqdn"] in u:
+                oast.add_mock_interaction(token=tok, protocol="dns",
+                                          remote_addr="10.20.30.40")
+        return httpx.Response(200, text="<p>ok</p>")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    v = asyncio.run(verify_rce("https://h.test/run?cmd=id", None, client,
+                               oast_client=oast, delay_seconds=0.05))
+    assert v.verified is True and v.method == "rce-oast"
+    assert "10.20.30.40" in v.detail
+    asyncio.run(client.aclose())
+
+
+def test_verify_blind_rce_sleep_timing():
+    """`sleep` komut kalıbı yanıt süresini tutarlı artırıyorsa kör RCE teyit edilir
+    (ölçekli ikinci orakl ile — SQLi zaman disiplininin birebir FP koruması)."""
+    import re as _re
+    from urllib.parse import unquote_plus
+
+    def handler(request):
+        u = unquote_plus(str(request.url))
+        g = _re.search(r"sleep (\d+)", u)
+        if g:
+            time.sleep(int(g.group(1)) * 0.9)
+        return httpx.Response(200, text="<p>ok</p>")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    v = asyncio.run(verify_blind_rce("https://h.test/run?cmd=id", client,
+                                     delay_seconds=1.0))
+    assert v.verified is True and v.method == "rce-blind-time"
+    assert v.severity == "critical" and "TEYİT" in v.detail
+    asyncio.run(client.aclose())
+
+
 def main():
     tests = [
         test_clear_sqli_confirmed, test_slow_jittery_server_not_confirmed,
@@ -430,6 +539,11 @@ def main():
         test_verify_error_based_sqli_value_in_proof,
         test_verify_union_extraction_reads_data,
         test_verify_union_extraction_no_marker_not_confirmed,
+        test_ssti_ladder_full_depth_to_rce,
+        test_ssti_ladder_context_read_without_rce,
+        test_verify_rce_echo_inband_still_wins,
+        test_verify_rce_oast_mock_confirmed,
+        test_verify_blind_rce_sleep_timing,
     ]
     for t in tests:
         t()

