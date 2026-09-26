@@ -5809,21 +5809,25 @@ class ScanPipelineV2:
         # sürüm kıyası deterministik — distro-intel doktriniyle aynı kademe).
         try:
             from .attack_graph import _threat_intel_for_cve
-            from .k8s_probe import match_k8s_cves
+            from .k8s_probe import match_k8s_cves, k8s_cve_pairs
             _cve_added = 0
-            for f in findings:
-                _ver = f.get("version")
-                if not _ver or f.get("product") != "kube-apiserver":
-                    continue
-                for _cve in match_k8s_cves("kube-apiserver", _ver):
+            # Ürün→CVE: yalnız kube-apiserver DEĞİL — kubelet/kube-controller-manager de resmî
+            # danışma matrisinde (k8s_cve_pairs). Ölçümlü sürüm yoksa apiserver gitVersion'ı
+            # küme geneli proxy'si olarak kullanılır.
+            for pair in k8s_cve_pairs(findings):
+                _prod = pair["product"]
+                _ver = pair["version"]
+                _src = pair["source"]
+                _tgt = pair["target"]
+                for _cve in match_k8s_cves(_prod, _ver):
                     _sev = str(_cve.get("severity") or "medium")
                     _win = " (yalnız Windows node'larda sömürülebilir)" if _cve.get("windows_only") else ""
                     apt_groups, techniques = _threat_intel_for_cve(_cve["cve"])
                     ev = Evidence(
-                        title=(f"Kubernetes kube-apiserver {_ver} — {_cve['cve']}: "
+                        title=(f"Kubernetes {_prod} {_ver} — {_cve['cve']}: "
                                f"{(_cve.get('title') or '')[:90]}{_win}"),
-                        severity=_sev, cve=_cve["cve"], target=f["target"],
-                        proof=(f"gitVersion={_ver} ↔ resmî K8s CVE danışması: "
+                        severity=_sev, cve=_cve["cve"], target=_tgt,
+                        proof=(f"{_prod} sürümü {_ver} ({_src}) ↔ resmî K8s CVE danışması: "
                                f"{_cve.get('match_reason', '')}. Etkilenen aralıklar: "
                                f"{'; '.join((_cve.get('affected') or [])[:4])}. "
                                f"Düzeltmeler: {json.dumps(_cve.get('fixed_in'), ensure_ascii=False)}. "
@@ -5836,13 +5840,13 @@ class ScanPipelineV2:
                         verification_method="version-advisory-match",
                         verification_detail=_cve.get("match_reason"),
                         verification_confidence=0.85)
-                    if engine.graph.add_evidence(ev, f"k8scve|{f['target']}|{_cve['cve']}"):
+                    if engine.graph.add_evidence(ev, f"k8scve|{_tgt}|{_prod}|{_cve['cve']}"):
                         _cve_added += 1
                         await narrate(
                             ScanEventType.CRITICAL_FINDING if _sev in ("critical", "high")
                             else ScanEventType.VULNERABILITY_FOUND,
-                            f"☸️ Kubernetes sürüm zaafiyeti: {_cve['cve']} @ {f['target']}",
-                            {"title": ev.title, "target": f["target"], "severity": _sev,
+                            f"☸️ Kubernetes sürüm zaafiyeti: {_cve['cve']} @ {_tgt}",
+                            {"title": ev.title, "target": _tgt, "severity": _sev,
                              "cve": _cve["cve"], "cvss_v3": _cve.get("cvss3"),
                              "confidence_tier": "probable", "tool": "k8s_probe"})
             if _cve_added:

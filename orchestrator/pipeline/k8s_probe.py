@@ -138,6 +138,160 @@ def classify_kubelet_denied(status: int, body: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def extract_kubelet_version(body: str) -> Optional[str]:
+    """kubelet /metrics gövdesinden gitVersion çıkar (SAF).
+    kubelet_version_info{...,git_version="v1.28.4",...} — Prometheus etiket metni."""
+    m = re.search(r'git_version="(v?\d+\.\d+\.\d+[^"]*)"', body or "")
+    return m.group(1) if m else None
+
+
+# Pod kaçış yüzeyi madde eşlemesi — CIS Kubernetes Benchmark 5.2.x + NSA/CISA K8s Hardening Guide.
+_ESCAPE_KIND_META = {
+    "runtime_sock": (
+        "critical", "Konteyner Runtime Socket Mount — Doğrudan Host Kaçışı",
+        "CIS 5.2.5 / NSA: konteyner çalışma zamanı socket'i (docker.sock/containerd.sock/crio.sock) "
+        "pod'a mount edilmiş — konteynerden host'a root'suz kaçış zinciri."),
+    "privileged": (
+        "critical", "Privileged Konteyner — Pod Kaçış Yüzeyi",
+        "CIS 5.2.1 / NSA: privileged=true cgroup/device sınırlarını kaldırır; host kernel'e "
+        "doğrudan erişim → kaçış primitifi hazır."),
+    "hostpath": (
+        "high", "hostPath Mount — Host Dosya Sistemi Erişimi",
+        "CIS 5.2.5 / NSA: hassas host yolları (/, /etc, /var/lib/kubelet, /var/run, ...) pod'a "
+        "mount edilmiş — host dosyalarına okuma/yazma ile kaçış ve kalıcılık."),
+    "host_ns": (
+        "high", "hostPID/hostNetwork/hostIPC Paylaşımı",
+        "CIS 5.2.2-5.2.4 / NSA: host namespace paylaşımı pod izolasyonunu deler (host process "
+        "görme / host ağ dinleme / IPC sızıntısı)."),
+    "caps": (
+        "high", "Geniş Linux Yetenekleri (CAP_SYS_ADMIN/NET_ADMIN/ALL/...)",
+        "CIS 5.2.7 / NSA: gereksiz yetenekler (SYS_ADMIN cgroup mount, SYS_MODULE modül yükleme, "
+        "SYS_PTRACE process enjeksiyonu) kaçış primitifi verir."),
+    "root_escalation": (
+        "medium", "Root + Privilege Escalation'a Açık Pod",
+        "CIS 5.2.6: runAsUser=0 ve allowPrivilegeEscalation=true — setuid/yetki yükseltme "
+        "zincirleri açık."),
+}
+
+
+def classify_pod_escape(podlist_body: str) -> List[Dict[str, Any]]:
+    """Anon kubelet /pods (PodList) gövdesinden POD-KAÇIŞ YÜZEYLERİNİ çıkar (SAF — yalnız
+    parse; istek YOK). CIS 5.2.x / NSA Hardening maddeleriyle eşli (bkz. _ESCAPE_KIND_META).
+    NEDEN: anon PodList serbestse pod spec'leri saldırganın okuyabildiği KANITLI veridir —
+    kaçış yolu (privileged / hostPID / hostPath / runtime-socket / capabilities) orada YAZILI
+    durur; tespit tahmin değil, döküman okumasıdır.
+    Gövde kırpılmış/bozuksa (kubelet yanıtı _get'te 16KB kırpılır) JSON parse düşer, regex
+    sinyal taramasına geçilir: yüzey yine raporlanır, yalnız pod eşlemesi eksilir (probable)."""
+    import json
+    body = podlist_body or ""
+    surfaces: List[Dict[str, Any]] = []
+    items: Optional[list] = None
+    try:
+        data = json.loads(body)
+        if isinstance(data, dict) and isinstance(data.get("items"), list):
+            items = data["items"]
+    except Exception:
+        items = None
+
+    if items is not None:
+        agg: Dict[str, List[str]] = {k: [] for k in _ESCAPE_KIND_META}
+        for pod in items:
+            try:
+                meta = pod.get("metadata") or {}
+                spec = pod.get("spec") or {}
+                pname = f"{meta.get('namespace', '?')}/{meta.get('name', '?')}"
+                psec = spec.get("securityContext") or {}
+                flags = [fl for fl in ("hostPID", "hostNetwork", "hostIPC") if spec.get(fl) is True]
+                if flags:
+                    agg["host_ns"].append(f"{pname} ({'+'.join(flags)})")
+                for v in (spec.get("volumes") or []):
+                    p = str((v.get("hostPath") or {}).get("path") or "").strip()
+                    if not p:
+                        continue
+                    lowp = p.lower()
+                    if lowp.endswith(("docker.sock", "containerd.sock", "crio.sock", "podman.sock")):
+                        agg["runtime_sock"].append(f"{pname} → {p}")
+                    elif p == "/" or lowp.startswith(("/etc", "/var/lib/kubelet", "/var/run",
+                                                      "/run", "/root", "/home")):
+                        agg["hostpath"].append(f"{pname} → {p}")
+                for c in (spec.get("containers") or []) + (spec.get("initContainers") or []):
+                    cname = f"{pname}:{c.get('name', '?')}"
+                    csec = c.get("securityContext") or {}
+                    if csec.get("privileged") is True:
+                        agg["privileged"].append(cname)
+                    adds = ((csec.get("capabilities") or {}).get("add")) or []
+                    risky = [str(x).upper() for x in adds
+                             if str(x).upper() in ("SYS_ADMIN", "SYS_MODULE", "SYS_PTRACE",
+                                                   "NET_ADMIN", "NET_RAW", "ALL")]
+                    if risky:
+                        agg["caps"].append(f"{cname} (+{'+'.join(risky)})")
+                    run_as = csec.get("runAsUser", psec.get("runAsUser"))
+                    esc = csec.get("allowPrivilegeEscalation", psec.get("allowPrivilegeEscalation"))
+                    if run_as == 0 and esc is True:
+                        agg["root_escalation"].append(cname)
+            except Exception:
+                continue
+        for kind, pods in agg.items():
+            if pods:
+                sev, title, cis = _ESCAPE_KIND_META[kind]
+                shown = ", ".join(pods[:5]) + (f" … (+{len(pods) - 5})" if len(pods) > 5 else "")
+                surfaces.append({
+                    "kind": kind, "severity": sev, "title": title,
+                    "proof": f"{len(pods)} pod/container: {shown}. {cis}",
+                    "tier": "confirmed", "pods": pods,
+                })
+        return surfaces
+
+    # REGEX FALLBACK — kırpılmış/bozuk gövdede JSON parse düşer: sinyal sayımı (pod eşlemesiz).
+    _fallback_pats = {
+        "privileged": r'"privileged"\s*:\s*true',
+        "host_ns": r'"host(PID|Network|IPC)"\s*:\s*true',
+        "runtime_sock": r'"path"\s*:\s*"[^"]*(docker|containerd|crio|podman)\.sock"',
+        "hostpath": (r'"path"\s*:\s*"(/|/etc[^"]*|/var/lib/kubelet[^"]*|/var/run[^"]*'
+                     r'|/run[^"]*|/root[^"]*|/home[^"]*)"'),
+    }
+    for kind, pat in _fallback_pats.items():
+        n = len(re.findall(pat, body))
+        if n:
+            sev, title, cis = _ESCAPE_KIND_META[kind]
+            surfaces.append({
+                "kind": kind, "severity": sev, "title": title,
+                "proof": (f"PodList gövdesi kırpılmış/bozuk — regex sinyal sayımı: {n}x "
+                          f"'{kind}' izi. {cis} Pod eşlemesi için tam gövde gerekir."),
+                "tier": "probable", "pods": [],
+            })
+    return surfaces
+
+
+def k8s_cve_pairs(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Bulgulardan (ürün, sürüm, kaynak, hedef) CVE eşleme çiftleri üret (SAF).
+    Doğrudan ölçüm (product+version damgası) öncelikli. kubelet / kube-controller-manager
+    için ölçüm yoksa apiserver gitVersion'ı KÜME GENELİ SÜRÜM PROXY'si olarak kullanılır —
+    tüm kontrol düzlemi bileşenleri aynı minor/patch'te sevk edilir; distro backport'u
+    danışmanın 'affected' listesinde görünür, kanıt kademesi yine probable'dır.
+    NOT: kubectl istemci tarafı olduğu için (sunucu sürümünden bağımsız CVE'ler taşır)
+    proxy listesine DAHİL EDİLMEZ — yalnızca ölçümü varsa eşleşir."""
+    pairs: List[Dict[str, Any]] = []
+    seen = set()
+    apiver = apitgt = None
+    for f in findings or []:
+        prod, ver = f.get("product"), f.get("version")
+        if prod == "kube-apiserver" and ver:
+            apiver, apitgt = ver, f.get("target")
+        if prod and ver and (prod, ver) not in seen:
+            seen.add((prod, ver))
+            pairs.append({"product": prod, "version": ver,
+                          "source": "doğrudan sürüm ölçümü", "target": f.get("target")})
+    if apiver and apitgt:
+        for prod in ("kubelet", "kube-controller-manager"):
+            if any(p["product"] == prod for p in pairs):
+                continue
+            pairs.append({"product": prod, "version": apiver,
+                          "source": "küme geneli sürüm proxy'si (apiserver gitVersion)",
+                          "target": apitgt})
+    return pairs
+
+
 # TLS sertifika kimliği — dağıtım/bileşen marker'ları. Sürüm ucu auth arkasında olduğunda
 # (RKE2 CIS: anonymous-auth=false → /version 401) DAĞITIMI yakalamanın tek dış yolu TLS
 # el-sıkışmasıdır: RKE2 serving-ca subject'i O=rke2, k3s CA O=k3s, CN=kube-apiserver...
@@ -407,11 +561,18 @@ async def _get(client, url: str) -> Optional[tuple]:
 
 
 def _finding(title, severity, target, proof, *, tier="confirmed",
-             cwe=None, mitre="T1613", method="k8s-unauth-probe") -> Dict[str, Any]:
-    return {"title": title, "severity": severity, "target": target, "proof": proof,
-            "confidence_tier": tier, "cwe": cwe or ["CWE-306"], "mitre": mitre,
-            "verification_method": method,
-            "verification_confidence": 0.9 if tier == "confirmed" else None}
+             cwe=None, mitre="T1613", method="k8s-unauth-probe",
+             product: Optional[str] = None, version: Optional[str] = None) -> Dict[str, Any]:
+    out = {"title": title, "severity": severity, "target": target, "proof": proof,
+           "confidence_tier": tier, "cwe": cwe or ["CWE-306"], "mitre": mitre,
+           "verification_method": method,
+           "verification_confidence": 0.9 if tier == "confirmed" else None}
+    # pipeline sürüm→CVE eşlemesi (k8s_cve_pairs) için ürün+sürüm damgası.
+    if product:
+        out["product"] = product
+    if version:
+        out["version"] = version
+    return out
 
 
 async def probe_kubernetes(host: str, open_ports: List[int], client,
@@ -548,6 +709,12 @@ async def probe_kubernetes(host: str, open_ports: List[int], client,
                             break
 
             elif component in ("kubelet", "kubelet-ro"):
+                # Sürüm çıkarımı (best-effort GET /metrics): 10255 (read-only) anonim döner,
+                # 10250'de auth arkasında olabilir → sessiz None (CVE proxy eşlemesi devreye girer).
+                _kver = None
+                rm = await _get(client, f"{base}/metrics")
+                if rm and rm[0] == 200:
+                    _kver = extract_kubelet_version(rm[1])
                 r = await _get(client, f"{base}/pods")
                 if r:
                     pods = classify_kubelet_pods(r[0], r[1])
@@ -558,7 +725,18 @@ async def probe_kubernetes(host: str, open_ports: List[int], client,
                             f"kubelet {port} auth'suz PodList döndü (~{pods.get('pod_hint')} isim). "
                             f"Pod env değişkenlerinde SIRLAR sızar; 10250'de /exec ile container'a "
                             f"komut çalıştırma (RCE) yüzeyi mevcut (ÇALIŞTIRILMADI). Anonim yanıt = kanıt.",
-                            cwe=["CWE-306"], mitre="T1552.007"))
+                            cwe=["CWE-306"], mitre="T1552.007",
+                            product="kubelet", version=_kver))
+                        # POD-KAÇIŞ YÜZEYİ (CIS 5.2.x / NSA Hardening): anon PodList serbestse pod
+                        # spec'leri saldırganın okuyabildiği KANITLI veridir — kaçış yolları
+                        # (privileged/hostPID/hostPath/runtime-socket/capabilities) orada yazılıdır.
+                        for surf in classify_pod_escape(r[1]):
+                            findings.append(_finding(
+                                f"{surf['title']} @ {base}", surf["severity"], base,
+                                surf["proof"], tier=surf.get("tier", "confirmed"),
+                                cwe=["CWE-250", "CWE-269"], mitre="T1611",
+                                method="k8s-pod-spec",
+                                product="kubelet", version=_kver))
                     else:
                         # kubelet kimliği auth duvarı ARDINDAN da doğrulanır (identity-first):
                         # "10250 dışa açık ve karşındaki kubelet" tek başına saldırı haritasıdır.
@@ -571,7 +749,8 @@ async def probe_kubernetes(host: str, open_ports: List[int], client,
                                 f"ağından erişilebilir, anonim yoklama reddediliyor (sertleştirme doğru). "
                                 f"Kimliği doğrulanmış SALDIRI YÜZEYİ: kubelet CVE yüzeyi ve credential "
                                 f"atağı dışarıdan mümkün (RCE yolu /exec — ÇALIŞTIRILMADI).",
-                                cwe=["CWE-200"], mitre="T1613", method="k8s-signature"))
+                                cwe=["CWE-200"], mitre="T1613", method="k8s-signature",
+                                product="kubelet", version=_kver))
 
             elif component in ("etcd", "etcd-peer"):
                 r = await _get(client, f"{base}/version")
@@ -587,7 +766,8 @@ async def probe_kubernetes(host: str, open_ports: List[int], client,
                         findings.append(_finding(
                             f"Kubernetes etcd Dış Ağa Açık @ {base}", sev, base, detail,
                             tier=("confirmed" if et.get("exposed") else "probable"),
-                            cwe=["CWE-306"], mitre="T1552"))
+                            cwe=["CWE-306"], mitre="T1552",
+                            product="etcd", version=et.get("version")))
                 # etcd v2 anahtar denemesi
                 r2 = await _get(client, f"{base}/v2/keys/?recursive=false")
                 if r2:

@@ -21,6 +21,7 @@ from pipeline.k8s_probe import (  # noqa: E402
     classify_nodeport, classify_registry_catalog, classify_dashboard,
     parse_k8s_semver, compare_k8s_versions, match_k8s_cves,
     load_k8s_cve_snapshot, probe_k8s_surface, is_nodeport,
+    extract_kubelet_version, classify_pod_escape, k8s_cve_pairs,
 )
 
 
@@ -119,14 +120,22 @@ class _R:
 
 
 class ExposedK8s:
-    """kubelet /pods ve apiserver anon /secrets ifşa eden yanlış-yapılandırılmış cluster."""
+    """kubelet /pods ve apiserver anon /secrets ifşa eden yanlış-yapılandırılmış cluster.
+    PodList ayrıca POD-KAÇIŞ yüzeyi taşır (privileged + hostPID + docker.sock mount)."""
     async def get(self, url, timeout=None):
         if url.endswith("/version") and ":6443" in url:
             return _R(200, '{"major":"1","gitVersion":"v1.27.3"}')
         if "/secrets" in url:
             return _R(200, '{"kind":"SecretList","items":[{"type":"Opaque"}]}')
         if url.endswith("/pods"):
-            return _R(200, '{"kind":"PodList","items":[{"metadata":{"name":"web"}}]}')
+            return _R(200, '{"kind":"PodList","items":['
+                           '{"metadata":{"name":"web","namespace":"default"},'
+                           '"spec":{"containers":[{"name":"c"}]}},'
+                           '{"metadata":{"name":"evil","namespace":"default"},'
+                           '"spec":{"hostPID":true,'
+                           '"containers":[{"name":"x","securityContext":{"privileged":true}}],'
+                           '"volumes":[{"name":"sock","hostPath":{"path":"/var/run/docker.sock"}}]}}'
+                           ']}')
         return _R(404, "not found")
 
 
@@ -143,6 +152,7 @@ def test_probe_exposed_cluster():
     titles = " ".join(f["title"] for f in findings)
     assert "Anonim Secret" in titles       # kritik anon secret
     assert "kubelet" in titles.lower()      # kubelet /pods ifşası
+    assert "Privileged Konteyner" in titles and "Runtime Socket" in titles  # CIS/NSA pod kaçış yüzeyi
     crit = [f for f in findings if f["severity"] == "critical"]
     assert crit and all(f["confidence_tier"] == "confirmed" for f in crit)
 
@@ -370,6 +380,76 @@ def test_probe_k8s_surface_registry_exposed():
 def test_probe_k8s_surface_no_nodeports():
     findings, hits = asyncio.run(probe_k8s_surface("x.io", [80, 443, 6443], NodePortFarm()))
     assert findings == [] and hits == {}
+
+
+# ---- Pod kaçış yüzeyi + kubelet sürüm + CVE çift üretimi (SAF) ----
+
+def test_extract_kubelet_version():
+    assert extract_kubelet_version(
+        'kubelet_version_info{git_version="v1.28.4",goversion="go1.21"}') == "v1.28.4"
+    assert extract_kubelet_version('kubelet_version_info{git_version="1.27.3"}') == "1.27.3"
+    assert extract_kubelet_version("metrik yok") is None
+
+
+def test_classify_pod_escape_json():
+    import json
+    podlist = json.dumps({
+        "kind": "PodList",
+        "items": [
+            {"metadata": {"name": "evil", "namespace": "default"},
+             "spec": {
+                 "hostPID": True,
+                 "containers": [{"name": "c1",
+                                 "securityContext": {"privileged": True,
+                                                     "capabilities": {"add": ["SYS_ADMIN"]}}}],
+                 "volumes": [{"name": "sock", "hostPath": {"path": "/var/run/docker.sock"}}],
+             }},
+            {"metadata": {"name": "rooty", "namespace": "default"},
+             "spec": {"containers": [{"name": "c2",
+                                      "securityContext": {"runAsUser": 0,
+                                                          "allowPrivilegeEscalation": True}}]}},
+            {"metadata": {"name": "ok", "namespace": "kube-system"},
+             "spec": {"containers": [{"name": "c", "securityContext": {"runAsNonRoot": True}}]}},
+        ]})
+    surf = classify_pod_escape(podlist)
+    kinds = {s["kind"] for s in surf}
+    assert {"privileged", "runtime_sock", "host_ns", "caps", "root_escalation"} <= kinds
+    assert all(s["tier"] == "confirmed" for s in surf)
+    by = {s["kind"]: s for s in surf}
+    assert by["runtime_sock"]["severity"] == "critical"
+    assert by["privileged"]["severity"] == "critical"
+    assert "CIS 5.2.1" in by["privileged"]["proof"]
+    # temiz pod listesi → yüzey YOK (FP yok)
+    clean = classify_pod_escape(json.dumps({"kind": "PodList", "items": [
+        {"metadata": {"name": "p"}, "spec": {"containers": [{"name": "c"}]}}]}))
+    assert clean == []
+
+
+def test_classify_pod_escape_truncated_fallback():
+    # kubelet /pods gövdesi _get'te 16KB kırpılır → JSON parse düşer, regex sinyal taraması çalışır
+    frag = ('{"kind":"PodList","items":[{"spec":{"privileged":true,"hostPID":true,'
+            '"volumes":[{"hostPath":{"path":"/etc"}}]}}')
+    surf = classify_pod_escape(frag)
+    kinds = {s["kind"] for s in surf}
+    assert {"privileged", "host_ns", "hostpath"} <= kinds
+    assert all(s["tier"] == "probable" for s in surf)
+
+
+def test_k8s_cve_pairs_direct_and_proxy():
+    # 1) doğrudan ölçüm: kubelet /metrics'ten okunan sürüm
+    pairs = k8s_cve_pairs([
+        {"product": "kube-apiserver", "version": "v1.27.3", "target": "https://h:6443"},
+        {"product": "kubelet", "version": "v1.28.4", "target": "https://h:10255"},
+    ])
+    by = {(p["product"], p["version"]) for p in pairs}
+    assert ("kube-apiserver", "v1.27.3") in by and ("kubelet", "v1.28.4") in by
+    # 2) ölçüm yoksa apiserver gitVersion'ı KÜME GENELİ proxy'si (kubelet + controller-manager)
+    pairs2 = k8s_cve_pairs([{"product": "kube-apiserver", "version": "v1.27.3", "target": "https://h:6443"}])
+    prods = {p["product"] for p in pairs2}
+    assert {"kube-apiserver", "kubelet", "kube-controller-manager"} <= prods
+    assert all("proxy" in p["source"] for p in pairs2 if p["product"] != "kube-apiserver")
+    # 3) sürüm sinyali yoksa çift yok (uydurma eşleme yok)
+    assert k8s_cve_pairs([{"product": "etcd"}]) == []
 
 
 if __name__ == "__main__":
