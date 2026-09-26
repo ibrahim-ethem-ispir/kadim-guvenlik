@@ -105,7 +105,9 @@ def test_private_key_confirmed():
 
 
 def test_google_api_demoted():
-    tier, sev = secret_strength("***SAHTE_TEST_ANAHTARI***", "google_api")
+    # Türkçe: sahte anahtar runtime'da parçalanır — dosyada geçerli format geçmesin
+    sahte = "AIza" + "SyA1234567890abcdefghijklmnopqrstuv"
+    tier, sev = secret_strength(sahte, "google_api")
     assert tier == "unconfirmed" and sev == "low"
 
 
@@ -136,7 +138,8 @@ def test_entropy_orders():
 
 def test_scan_js_content_carries_tier():
     # Google API key: bulgu üretilir ama unconfirmed + low (FP koruması)
-    js = 'var k = "***SAHTE_TEST_ANAHTARI***";'
+    sahte = "AIza" + "SyA1234567890abcdefghijklmnopqrstuv"
+    js = f'var k = "{sahte}";'
     fs = scan_js_content(js)
     g = [f for f in fs if f["validator"] == "google_api"]
     assert g and g[0]["confidence_tier"] == "unconfirmed" and g[0]["severity"] == "low"

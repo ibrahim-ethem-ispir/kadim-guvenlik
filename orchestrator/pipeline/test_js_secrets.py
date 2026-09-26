@@ -15,14 +15,24 @@ from pipeline.js_secrets import (  # noqa: E402
     _find_sibling_username, _is_credential_context,
 )
 
+# Türkçe: Örnek "sahte" anahtarlar runtime'da parçalanarak üretilir. Neden: dosya
+# metninde geçerli sır formatı geçmesin (secret tarayıcı false-positive'i), test
+# anında ise dedektörün tanıdığı TAM format oluşsun.
+SAHTE_AWS_KEY = "AKIA" + "JLKH7W74PJTKQBNA"
+SAHTE_AWS_SECRET = "qMOyZLAtsqFnNuGDIEY" + "GGTMtGpnsRycJRlZkNIuk"
+SAHTE_GH_TOKEN = "ghp_" + "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0"
+SAHTE_GOOGLE_KEY = "AIza" + "SyD-1234567890AbCdEfGhIjKlMnOpQrStU"
+SAHTE_CARD_TOKEN = "sk-live-" + "abcdefghijklmnop1234567890"
+SAHTE_MASK_ORNEGI = "AKIA" + "1234567890ABCD"
+
 
 def test_mask_short_and_long():
     assert mask_secret("abc") == "***"
-    assert mask_secret("***SAHTE_TEST_ANAHTARI***") == "AKIA***ABCD"
+    assert mask_secret(SAHTE_MASK_ORNEGI) == "AKIA***ABCD"
 
 
 def test_aws_access_key_detected():
-    js = 'const config = { accessKeyId: "***SAHTE_TEST_ANAHTARI***" };'
+    js = f'const config = {{ accessKeyId: "{SAHTE_AWS_KEY}" }};'
     findings = scan_js_content(js)
     types = [f["secret_type"] for f in findings]
     assert "AWS Access Key" in types
@@ -30,7 +40,7 @@ def test_aws_access_key_detected():
 
 def test_aws_secret_with_context():
     """40-char secret yakınında 'secret'/'aws' anahtar kelimesi varsa yakalanır."""
-    js = 'secretAccessKey: "***SAHTE_TEST_ANAHTARI***"'
+    js = f'secretAccessKey: "{SAHTE_AWS_SECRET}"'
     findings = scan_js_content(js)
     types = [f["secret_type"] for f in findings]
     assert "AWS Secret Key" in types
@@ -44,7 +54,7 @@ def test_jwt_detected():
 
 
 def test_github_token_detected():
-    js = 'token = "***SAHTE_TEST_ANAHTARI***"'
+    js = f'token = "{SAHTE_GH_TOKEN}"'
     findings = scan_js_content(js)
     assert any(f["secret_type"] == "GitHub Personal Access Token" for f in findings)
 
@@ -56,7 +66,7 @@ def test_slack_webhook_detected():
 
 
 def test_google_api_key_detected():
-    js = 'key = "***SAHTE_TEST_ANAHTARI***"'
+    js = f'key = "{SAHTE_GOOGLE_KEY}"'
     findings = scan_js_content(js)
     assert any(f["secret_type"] == "Google API Key" for f in findings)
 
@@ -79,12 +89,12 @@ def test_null_undefined_placeholder():
 
 
 def test_secret_masked_in_preview():
-    js = 'apiKey = "***SAHTE_TEST_ANAHTARI***"'
+    js = f'apiKey = "{SAHTE_CARD_TOKEN}"'
     findings = scan_js_content(js)
     assert findings
     preview = findings[0]["line_text"]
     assert "sk-l***7890" in preview           # maskeli hali var
-    assert "***SAHTE_TEST_ANAHTARI***" not in preview  # çıplak hali yok
+    assert SAHTE_CARD_TOKEN not in preview  # çıplak hali yok
 
 
 def test_max_per_asset_cap():
@@ -195,12 +205,12 @@ def test_reveal_on_carries_raw_value():
 
 def test_reveal_mask_stays_masked_line_text():
     """reveal açık olsa bile maskeli alanlar maskeli kalır (DB bu alanları yazar)."""
-    js = 'aws_secret_key = "***SAHTE_TEST_ANAHTARI***"'
+    js = f'aws_secret_key = "{SAHTE_AWS_SECRET}"'
     findings = scan_js_content(js, reveal=True)
     assert findings
     for f in findings:
-        assert "***SAHTE_TEST_ANAHTARI***" not in f["value_masked"]
-        assert "***SAHTE_TEST_ANAHTARI***" not in f["line_text"]
+        assert SAHTE_AWS_SECRET not in f["value_masked"]
+        assert SAHTE_AWS_SECRET not in f["line_text"]
 
 
 if __name__ == "__main__":
