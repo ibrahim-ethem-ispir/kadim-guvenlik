@@ -133,6 +133,18 @@ AUTO_ACTIVATE_USERS=false   # yeni kullanıcılar admin onayı bekler (isteğe b
 ```
 - **OSINT**: http://localhost:5566/osint
 
+## 🖥️ Arayüz
+
+![Ana sayfa — güvenlik skoru ve özet](assets/screenshots/anasayfa.png)
+
+![Otonom tarama — canlı karar ve olay akışı](assets/screenshots/auto-scan.png)
+
+![Aktif taramalar — devam eden taramaların izlenmesi](assets/screenshots/aktif-taramalar.png)
+
+![Manuel tarama — araç bazlı elle tarama](assets/screenshots/manuel-tarama.png)
+
+![Nmap — gelişmiş tarama konsolu](assets/screenshots/nmap.png)
+
 ## 📖 Kullanım
 
 ### 1. AI Brain (Akıllı Güvenlik Asistanı)
