@@ -6,11 +6,11 @@ RUN npm install -g pnpm@11
 # Türkçe: pnpm-workspace.yaml install'dan ÖNCE gelmeli — build script izinleri
 # (dangerouslyAllowAllBuilds) orada tanımlı; yoksa ERR_PNPM_IGNORED_BUILDS olur.
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
-# Türkçe: vendor/ ŞART — xlsx (SheetJS) depoya gömülü tarball'dan kurulur (file:vendor/...);
-# kopyalanmazsa pnpm install ENOENT ile düşer (registry'de 0.20.3 YOK — npm bilinen bayat).
-# NOT: pnpm 11.0.0 file:/URL tarball bağımlılıklarında lock 'resolution' alanına 'tarball:'
-# yazmıyor → soğuk kurumda registry URL'i uydurup 404 düşüyor; lock'taki tarball: alanı
-# BİLİNÇLİ elle tamamlanmıştır. --frozen-lockfile build'in lock'u yeniden yazmasını keser.
+# Türkçe: vendor/ ŞART — xlsx (SheetJS 0.20.3) depoya gömülü DİZİN bağımlılığıdır
+# (file:vendor/xlsx). Neden dizin: (1) npm registry'de xlsx bilinen bayat (0.18.5),
+# URL/tarball bağımlılıklarında pnpm 11.0.0 soğuk kurumda lock'tan tarball kaynağı
+# türetemeyip uydurma registry URL'ine 404 düşüyor; (2) dizin bağımlılığı fetch mantığına
+# dokunmaz — lock yeniden yazılsa da bozulmaz. Kopyalanmazsa install ENOENT ile düşer.
 COPY vendor/ ./vendor/
 RUN pnpm install --frozen-lockfile
 COPY . .

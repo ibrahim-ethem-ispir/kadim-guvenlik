@@ -42,8 +42,8 @@ importers:
         specifier: ^3.5.1
         version: 3.5.1(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react-is@19.2.1)(react@19.2.0)(redux@5.0.1)
       xlsx:
-        specifier: file:vendor/xlsx-0.20.3.tgz
-        version: file:vendor/xlsx-0.20.3.tgz
+        specifier: file:vendor/xlsx
+        version: file:vendor/xlsx
     devDependencies:
       '@react-router/dev':
         specifier: ^7.9.2
@@ -1823,9 +1823,8 @@ packages:
     resolution: {integrity: sha512-si7QWI6zUMq56bESFvagtmzMdGOtoxfR+Sez11Mobfc7tm+VkUckk9bW2UeffTGVUbOksxmSw0AA2gs8g71NCQ==}
     engines: {node: '>=12'}
 
-  xlsx@file:vendor/xlsx-0.20.3.tgz:
-    resolution: {integrity: sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA==}
-    version: 0.20.3
+  xlsx@file:vendor/xlsx:
+    resolution: {directory: vendor/xlsx, type: directory}
     engines: {node: '>=0.8'}
     hasBin: true
 
@@ -3509,6 +3508,6 @@ snapshots:
       string-width: 5.1.2
       strip-ansi: 7.1.2
 
-  xlsx@file:vendor/xlsx-0.20.3.tgz: {}
+  xlsx@file:vendor/xlsx: {}
 
   yallist@3.1.1: {}
