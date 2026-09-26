@@ -3,6 +3,14 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-compose-blue?logo=docker&logoColor=white)](docker-compose.yml)
 
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-2021-000000?logo=rust&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-8.0-47A248?logo=mongodb&logoColor=white)
+![Qdrant](https://img.shields.io/badge/Qdrant-Vector%20DB-DC2E51?logo=qdrant&logoColor=white)
+
 **Open-source autonomous security scanning platform** — nmap, nuclei, subfinder, fuzzing & OSINT orchestrated by AI and an attack-graph engine. 15 microservices (Python / Rust / Go / React), MongoDB + Qdrant, Docker Compose.
 
 Mikroservis mimarisinde geliştirilmiş, AI destekli, Docker tabanlı, ölçeklenebilir siber güvenlik platformu.

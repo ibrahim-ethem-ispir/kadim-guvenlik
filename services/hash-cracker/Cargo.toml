@@ -2,6 +2,9 @@
 name = "hash-cracker"
 version = "0.1.0"
 edition = "2021"
+description = "Kadim Güvenlik — yüksek performanslı hash kırma servisi (MD5, SHA, bcrypt, scrypt, Argon2)"
+license = "MIT"
+keywords = ["hash", "cracker", "security", "rust"]
 
 [dependencies]
 # Web Framework

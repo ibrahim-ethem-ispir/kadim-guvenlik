@@ -2,6 +2,9 @@
 name = "fuzz-service-rs"
 version = "0.1.0"
 edition = "2021"
+description = "Kadim Güvenlik — Feroxbuster tabanlı dizin/endpoint fuzz servisi"
+license = "MIT"
+keywords = ["fuzzing", "security", "feroxbuster", "web"]
 
 [dependencies]
 # Web Framework

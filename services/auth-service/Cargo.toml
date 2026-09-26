@@ -2,6 +2,9 @@
 name = "auth-service"
 version = "0.1.0"
 edition = "2021"
+description = "Kadim Güvenlik — JWT kimlik doğrulama servisi"
+license = "MIT"
+keywords = ["security", "authentication", "jwt", "axum"]
 
 [dependencies]
 axum = { version = "0.7", features = ["macros"] }

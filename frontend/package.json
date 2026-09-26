@@ -2,6 +2,16 @@
   "name": "kadim-frontend",
   "private": true,
   "version": "0.0.0",
+  "description": "Kadim Güvenlik Platformu UI — otonom güvenlik tarama, OSINT ve AI analiz panosu",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "vulnerability-scanner",
+    "pentest",
+    "osint",
+    "nmap",
+    "nuclei"
+  ],
   "type": "module",
   "packageManager": "pnpm@11.0.0",
   "scripts": {

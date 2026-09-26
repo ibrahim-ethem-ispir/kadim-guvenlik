@@ -2,6 +2,9 @@
 name = "recon_service"
 version = "1.0.0"
 edition = "2021"
+description = "Kadim Güvenlik — keşif ve teknoloji parmak izi servisi"
+license = "MIT"
+keywords = ["recon", "fingerprinting", "security"]
 
 [dependencies]
 # Web Framework

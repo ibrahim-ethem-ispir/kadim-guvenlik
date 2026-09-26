@@ -2,6 +2,9 @@
 name = "wifi-service"
 version = "0.1.0"
 edition = "2021"
+description = "Kadim Güvenlik — kablosuz ağ güvenlik denetim servisi"
+license = "MIT"
+keywords = ["wifi", "security", "audit"]
 
 [dependencies]
 actix-web = "4"

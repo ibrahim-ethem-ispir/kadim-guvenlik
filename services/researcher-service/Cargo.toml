@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Kadim Güvenlik Team"]
 description = "Zero-Day Research & Security Analysis Engine - Modern web framework vulnerability detection"
+license = "MIT"
+keywords = ["security", "vulnerability", "research"]
 
 [dependencies]
 # Web Framework - High performance async HTTP server

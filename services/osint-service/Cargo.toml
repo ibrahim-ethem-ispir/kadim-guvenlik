@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Kadim Güvenlik Team"]
 description = "Maltego benzeri OSINT Intelligence servisi - Domain, IP, Email analizi ve graph görselleştirme"
+license = "MIT"
+keywords = ["osint", "security", "threat-intel", "recon"]
 
 [dependencies]
 # Web Framework - Yüksek performanslı async HTTP server

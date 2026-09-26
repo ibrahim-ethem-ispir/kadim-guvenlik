@@ -2,6 +2,9 @@
 name = "stress-service"
 version = "0.1.0"
 edition = "2021"
+description = "Kadim Güvenlik — yük testi ve endpoint dayanıklılık servisi"
+license = "MIT"
+keywords = ["load-testing", "stress-testing", "security"]
 
 [dependencies]
 # Web Framework
