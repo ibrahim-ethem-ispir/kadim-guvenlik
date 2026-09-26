@@ -451,6 +451,61 @@ def classify_dashboard(status: int, body: str, headers: Optional[Dict[str, Any]]
     return None
 
 
+def classify_etcd_health(status: int, body: str) -> Optional[Dict[str, Any]]:
+    """etcd v3 /health yanıtı (SAF): {"health":"true"} = v3 API yüzeyi doğrulandı.
+    v3 gRPC range POST gerektirdiğinden (doktrin: yalnız GET) denenmez; /health + /metrics
+    v3 katmanının dışarıdan ölçülebilir iki ucudur."""
+    body = body or ""
+    if status == 200 and '"health"' in body:
+        m = re.search(r'"health"\s*:\s*"(true|false)"', body)
+        if m:
+            return {"kind": "etcd_v3_health", "healthy": m.group(1) == "true"}
+    return None
+
+
+def classify_etcd_metrics(status: int, body: str) -> Optional[Dict[str, Any]]:
+    """etcd /metrics sızıntısı (SAF): sürüm + db boyutu + toplam anahtar sayısı."""
+    body = body or ""
+    if status != 200 or "etcd_" not in body:
+        return None
+    ver = re.search(r'server_version="([^"]+)"', body)
+    db = re.search(r"etcd_mvcc_db_total_size_in_bytes\s+([0-9.eE+]+)", body)
+    keys = re.search(r"etcd_debugging_mvcc_keys_total\s+([0-9.eE+]+)", body)
+    return {"kind": "etcd_metrics",
+            "version": ver.group(1) if ver else None,
+            "db_bytes": int(float(db.group(1))) if db else None,
+            "keys": int(float(keys.group(1))) if keys else None}
+
+
+def extract_manifest_config_digest(manifest_body: str) -> Optional[str]:
+    """Registry manifest gövdesinden config blob digest'i çıkar (SAF)."""
+    m = re.search(r'"config"\s*:\s*\{[^}]*"digest"\s*:\s*"([^"]+)"', manifest_body or "")
+    return m.group(1) if m else None
+
+
+_REGISTRY_SECRET_RE = re.compile(
+    r'\b([A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|API_?KEY|PRIVATE_?KEY|ACCESS_?KEY|'
+    r'CREDENTIAL)[A-Z0-9_]*)\s*[=:]\s*["\']?([^\s"\',;]{6,})', re.I)
+
+
+def classify_registry_secrets(config_body: str, max_hits: int = 5) -> List[Dict[str, str]]:
+    """İmaj config blob'unda (v2 registry) env/history SIR desenleri tara (SAF).
+    Katman (layer) İNDİRİLMEZ — yalnız config JSON. Değerler MASKELENİR (kanıt: anahtar
+    adı + ilk 2 karakter + uzunluk) — rapor sızıntıyı büyütmeyecek. NSA/K8s Hardening:
+    'imaj içinde gömülü sır' tedarik zinciri riski (çeken herkes elde eder)."""
+    hits: List[Dict[str, str]] = []
+    seen = set()
+    for m in _REGISTRY_SECRET_RE.finditer(config_body or ""):
+        key, val = m.group(1), m.group(2)
+        if key.upper() in seen:
+            continue
+        seen.add(key.upper())
+        hits.append({"key": key, "masked_value": f"{val[:2]}*** (uzunluk {len(val)})"})
+        if len(hits) >= max_hits:
+            break
+    return hits
+
+
 # ---- Sürüm karşılaştırma + resmî CVE danışma matrisi (Madde 5 / T4) ----
 
 def parse_k8s_semver(version: str) -> Optional[tuple]:
@@ -777,7 +832,38 @@ async def probe_kubernetes(host: str, open_ports: List[int], client,
                             f"Kubernetes etcd Anonim Anahtar İfşası @ {base}",
                             "critical", base,
                             "Auth'suz GET /v2/keys → anahtar ağacı döndü. Cluster sırları dökülebilir.",
-                            cwe=["CWE-306"], mitre="T1552"))
+                            cwe=["CWE-306"], mitre="T1552",
+                            product="etcd"))
+                # etcd v3 yüzeyi (yalnız GET): /health (v3 API doğrulama) + /metrics
+                # (sürüm + db boyutu + anahtar sayısı). v3 gRPC range POST gerektirdiğinden
+                # doktrin gereği DENENMEZ — dışarıdan ölçülebilir v3 uçları bunlardır.
+                r3 = await _get(client, f"{base}/health")
+                if r3:
+                    eh = classify_etcd_health(r3[0], r3[1])
+                    if eh:
+                        findings.append(_finding(
+                            f"etcd v3 API Yüzeyi Açık @ {base}",
+                            "medium", base,
+                            f"Auth'suz GET /health → etcd v3 sağlık yanıtı (healthy={eh.get('healthy')}). "
+                            f"etcd v3 API'si dış ağdan erişilebilir; kimlik doğrulaması sorgulanmalı — "
+                            f"anonimse tüm cluster durum verisi okunabilir (gRPC range okuma bu probun "
+                            f"kapsamı DIŞINDA: yalnız GET ile yüzey kaydı).",
+                            tier="confirmed",
+                            cwe=["CWE-306"], mitre="T1552",
+                            method="etcd-v3-signature",
+                            product="etcd"))
+                r4 = await _get(client, f"{base}/metrics")
+                if r4:
+                    em = classify_etcd_metrics(r4[0], r4[1])
+                    if em:
+                        findings.append(_finding(
+                            f"etcd Metrik/Metadata Sızıntısı @ {base}",
+                            "low", base,
+                            f"Auth'suz GET /metrics → etcd sürümü ({em.get('version') or '?'}), "
+                            f"db boyutu ({em.get('db_bytes')} bayt), toplam anahtar ({em.get('keys')}). "
+                            f"Sürüm damgası CVE hedeflemesini, sayılar küme ölçeği istihbaratını verir.",
+                            cwe=["CWE-200"], mitre="T1613", method="etcd-metrics-signature",
+                            product="etcd", version=em.get("version")))
 
             elif component in ("kube-proxy", "kube-scheduler", "kube-controller"):
                 # Rol damgalama: healthz/proxyMode açık → hostun K8s rolü doğrulanır.
@@ -843,7 +929,8 @@ async def probe_k8s_surface(host: str, open_ports: List[int], client,
                             ) -> tuple:
     """NodePort aralığındaki AÇIK portlarda tahribatsız imza pası (V2 / Madde 5).
     rustscan tam-port bu portları GÖRÜYOR ama kimse sınıflandırmıyordu. Port başına
-    en fazla ~4 GET (yalnız ZATEN açık portlara — gürültü doktrini korunur):
+    en fazla ~4 GET (yalnız ZATEN açık portlara — gürültü doktrini korunur); anon katalog
+    açıksa imaj-içi sır taraması +~9 GET daha (ilk 3 imaj: tags → manifest → config blob):
       /version (https→http) → apiserver imzası + sürüm; değilse / → dashboard;
       Docker-Distribution header'ı görüldüyse /v2/_catalog → anon katalog ifşası.
     Dönüş: (findings, api_hits). api_hits = {port: şema} — KUBE_PORTS DIŞINDA doğrulanmış
@@ -890,6 +977,45 @@ async def probe_k8s_surface(host: str, open_ports: List[int], client,
                           "(gömülü sırlar/kaynak kod dahil) dışarıdan ÇEKİLEBİLİR. "
                           "Anonim yanıt = deterministik kanıt.",
                         cwe=["CWE-306", "CWE-538"], mitre="T1613"))
+                    # İMAJ-İÇİ SIR TARAMASI (hafif, +~9 GET / 3 imaj): tags → manifest → config
+                    # blob (yalnız GET; katman LAYER'ları İNDİRİLMEZ). Anon katalog açıksa config
+                    # ENV/history'sindeki sır desenleri maskeli kanıtla raporlanır — gömülü
+                    # credential tedarik zinciri kanıtı (NSA/K8s Hardening).
+                    for repo in (repos or [])[:3]:
+                        try:
+                            tg = await _get_full(client, f"{base}/v2/{repo}/tags/list")
+                            if not tg:
+                                continue
+                            tm = re.search(r'"tags"\s*:\s*\[(.*?)\]', tg[1] or "", re.S)
+                            tag = None
+                            if tm:
+                                tag = next((t.strip(' "') for t in tm.group(1).split(",")
+                                            if t.strip(' "')), None)
+                            if not tag:
+                                continue
+                            mf = await _get_full(client, f"{base}/v2/{repo}/manifests/{tag}")
+                            if not mf:
+                                continue
+                            digest = extract_manifest_config_digest(mf[1] or "")
+                            if not digest:
+                                continue
+                            bl = await _get_full(client, f"{base}/v2/{repo}/blobs/{digest}")
+                            if not bl:
+                                continue
+                            secs = classify_registry_secrets(bl[1] or "")
+                            if secs:
+                                findings.append(_finding(
+                                    f"İmaj İçinde Gömülü Sır @ {base} ({repo}:{tag})",
+                                    "high", base,
+                                    f"Auth'suz config blob okundu ({repo}:{tag}) — ENV/history "
+                                    f"içinde {len(secs)} sır deseni: "
+                                    + "; ".join(f"{s['key']}={s['masked_value']}" for s in secs)
+                                    + ". İmaj içinde gömülü credential (NSA tedarik zinciri riski): "
+                                      "imajı çeken herkes elde eder. Değerler maskeli.",
+                                    cwe=["CWE-798"], mitre="T1552.001",
+                                    method="registry-config-scan"))
+                        except Exception:
+                            continue
                 else:
                     findings.append(_finding(
                         f"Private Container Registry Dış Ağa Açık @ {base}",

@@ -5633,6 +5633,10 @@ class ScanPipelineV2:
         except Exception as e:
             logger.info(f"K8s yüzey probu atlandı (best-effort, scan={session.scan_id}): {e}")
             return
+        # Kapsama sinyalleri (coverage_contract._c_k8s_registry): registry yüzeyi denetlendi mi?
+        root.meta["k8s_surface_probed"] = True
+        root.meta["k8s_registry_probed"] = any("Registry" in f.get("title", "") for f in findings)
+        root.meta["k8s_registry_exposed"] = any("Katalog" in f.get("title", "") for f in findings)
         # NodePort'tan doğrulanan K8s API portları → tek doğruluk kaynağı havuzları:
         # (a) root.meta['k8s_api_ports'] → _probe_kubernetes extra_ports ile derin yoklar;
         # (b) sig-cache hits → sonraki _ensure_target_profile turu profil sinyali (0.9)
@@ -5757,6 +5761,14 @@ class ScanPipelineV2:
         except Exception as e:
             logger.info(f"K8s probu atlandı (best-effort, scan={session.scan_id}): {e}")
             return
+        # Alt-yüzey kapsama sinyalleri (coverage_contract._c_k8s_*): operatöre "hangi K8s
+        # denetimi koştu, ne buldu" güvencesi — bulgu yoksa sessiz 'temiz' yerine gerekçeli.
+        root.meta["k8s_escape_surfaces"] = sum(
+            1 for f in findings if f.get("verification_method") == "k8s-pod-spec")
+        root.meta["k8s_pods_readable"] = any(
+            "Auth'suz /pods" in f.get("title", "") for f in findings)
+        root.meta["k8s_etcd_findings"] = sum(
+            1 for f in findings if f.get("product") == "etcd")
         # Sürüm bulunan bileşen → SERVICE düğümü seed: "tespit→CVE/KEV" halkası kurulsun
         # (RKE2 sürüm damgası NVD+KEV'e akmadan bulgu yarım kalırdı — WP envanter deseni).
         try:

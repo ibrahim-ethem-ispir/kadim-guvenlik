@@ -107,6 +107,33 @@ def test_kubernetes_if_relevant_gate_reasons():
     assert e["status"] == FOUND
 
 
+def test_k8s_subitems_escape_etcd_registry():
+    # POD KAÇIŞ YÜZEYİ (CIS 5.2 / NSA): bulundu / temiz / kontrol-edilemedi
+    f1 = _cls(build_coverage({"meta": {"k8s_probed": True, "k8s_escape_surfaces": 2}}),
+              "infra.k8s_pod_escape")
+    assert f1["status"] == FOUND and f1["confirmed"] is True
+    c1 = _cls(build_coverage({"meta": {"k8s_probed": True, "k8s_pods_readable": True}}),
+              "infra.k8s_pod_escape")
+    assert c1["status"] == CLEAN and "CIS" in c1["reason"]
+    n1 = _cls(build_coverage({"meta": {"k8s_probed": True}}), "infra.k8s_pod_escape")
+    assert n1["status"] == NOT_CHECKED and "kimlikli" in n1["reason"]
+    # ETCD maruziyeti
+    f2 = _cls(build_coverage({"meta": {"k8s_probed": True, "k8s_etcd_findings": 1}}), "infra.k8s_etcd")
+    assert f2["status"] == FOUND
+    c2 = _cls(build_coverage({"meta": {"k8s_probed": True}}), "infra.k8s_etcd")
+    assert c2["status"] == CLEAN
+    n2 = _cls(build_coverage({}), "infra.k8s_etcd")
+    assert n2["status"] == NOT_CHECKED
+    # REGISTRY ifşası (NodePort)
+    f3 = _cls(build_coverage({"meta": {"k8s_surface_probed": True, "k8s_registry_exposed": True}}),
+              "infra.k8s_registry")
+    assert f3["status"] == FOUND
+    c3 = _cls(build_coverage({"meta": {"k8s_surface_probed": True}}), "infra.k8s_registry")
+    assert c3["status"] == CLEAN
+    n3 = _cls(build_coverage({}), "infra.k8s_registry")
+    assert n3["status"] == NOT_CHECKED and "yüzey" in n3["reason"]
+
+
 def test_resilience_toggle_gap_visible():
     # ŞİKAYET (DDoS dersi): toggle kapalıysa availability ekseni HİÇ ölçülmez — görünür olmalı.
     off = _cls(build_coverage({}), "availability.resilience")

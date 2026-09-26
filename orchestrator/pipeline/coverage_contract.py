@@ -345,6 +345,69 @@ def _c_kubernetes(cx: _Ctx) -> Dict[str, Any]:
                "if_relevant kapısı kapalı; K8s doğrulanamadı.")
 
 
+def _c_k8s_escape(cx: _Ctx) -> Dict[str, Any]:
+    # CIS 5.2.x / NSA Hardening — pod kaçış yüzeyi (privileged/hostPID/hostPath/runtime-socket).
+    # KAYNAK: anon kubelet /pods PodList gövdesi → k8s_probe.classify_pod_escape meta sinyalleri.
+    label = "K8s pod kaçış yüzeyi (CIS 5.2 / NSA)"
+    try:
+        n = int(cx.meta_get("k8s_escape_surfaces") or 0)
+    except (TypeError, ValueError):
+        n = 0
+    if n:
+        return _mk("infra.k8s_pod_escape", label, "infra", FOUND,
+                   f"{n} pod kaçış yüzeyi spec'te KANITLANDI (privileged/hostPID/hostPath/"
+                   f"runtime-socket/capabilities) — CIS 5.2/NSA ihlali.", n, "critical", True)
+    if cx.meta_truthy("k8s_pods_readable"):
+        return _mk("infra.k8s_pod_escape", label, "infra", CLEAN,
+                   "Anon PodList okundu; kaçış yüzeyi YOK (privileged/hostPID/hostPath/socket "
+                   "temiz) — CIS 5.2 pod izolasyonu doğrulandı.")
+    if cx.meta_truthy("k8s_probed"):
+        return _mk("infra.k8s_pod_escape", label, "infra", NOT_CHECKED,
+                   "K8s probu koştu ama anon PodList okunamadı (kubelet auth duvarı arkasında) — "
+                   "pod spec denetlenemedi; CIS 5.2 için kimlikli erişim (kubeconfig/servis "
+                   "hesabı) gerekir.")
+    return _mk("infra.k8s_pod_escape", label, "infra", NOT_CHECKED,
+               "K8s if_relevant kapısı açılmadı — pod kaçış denetimi kapsam dışı.")
+
+
+def _c_k8s_etcd(cx: _Ctx) -> Dict[str, Any]:
+    # etcd maruziyeti (2379/2380 + v3 /health /metrics) — anon anahtar/metrik sızıntısı.
+    label = "K8s etcd maruziyeti (2379/2380)"
+    try:
+        n = int(cx.meta_get("k8s_etcd_findings") or 0)
+    except (TypeError, ValueError):
+        n = 0
+    if n:
+        return _mk("infra.k8s_etcd", label, "infra", FOUND,
+                   f"{n} etcd maruziyeti kanıtlandı (anon anahtar/metrik/sürüm sızıntısı) — "
+                   f"cluster durum verisi risk altında.", n, "critical", True)
+    if cx.meta_truthy("k8s_probed"):
+        return _mk("infra.k8s_etcd", label, "infra", CLEAN,
+                   "K8s probu etcd portlarını yokladı; anon maruziyet yok (port kapalı/firewall "
+                   "arkasında ya da auth'lu).")
+    return _mk("infra.k8s_etcd", label, "infra", NOT_CHECKED,
+               "K8s probu koşmadı — etcd maruziyeti doğrulanamadı.")
+
+
+def _c_k8s_registry(cx: _Ctx) -> Dict[str, Any]:
+    # NodePort yüzeyi: private container registry anon katalog + imaj-içi sır sızıntısı.
+    label = "K8s private registry ifşası (NodePort)"
+    if cx.meta_truthy("k8s_registry_exposed"):
+        return _mk("infra.k8s_registry", label, "infra", FOUND,
+                   "Anon katalog ifşası kanıtlandı — dahili imajlar ve gömülü sırlar dışarıdan "
+                   "çekilebilir.", 1, "critical", True)
+    if cx.meta_truthy("k8s_registry_probed"):
+        return _mk("infra.k8s_registry", label, "infra", CLEAN,
+                   "Registry imzası görüldü ama katalog anonim DEĞİL (auth var) — sertleştirme "
+                   "kısmen doğru.")
+    if cx.meta_truthy("k8s_surface_probed"):
+        return _mk("infra.k8s_registry", label, "infra", CLEAN,
+                   "NodePort yüzey pası koştu; Docker Distribution imzası/katalog ifşası yok.")
+    return _mk("infra.k8s_registry", label, "infra", NOT_CHECKED,
+               "NodePort yüzey pası koşmadı (K8S_PROBE_V2 kapalı ya da NodePort aralığında açık "
+               "port yok) — registry yüzeyi incelenmedi.")
+
+
 def _c_hypervisor(cx: _Ctx) -> Dict[str, Any]:
     # Hypervisor/sanallaştırma mgmt arayüzü (ESXi/vCenter/Proxmox/Cockpit/oVirt) internete açık mı.
     n, sev, conf = cx.findings("hypervisor_probe")
@@ -491,6 +554,9 @@ _RESOLVERS = [
     _c_idor,
     _c_race_condition,
     _c_kubernetes,
+    _c_k8s_escape,
+    _c_k8s_etcd,
+    _c_k8s_registry,
     _c_hypervisor,
     _c_wordpress,
     _c_deserialization,

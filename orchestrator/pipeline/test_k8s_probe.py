@@ -22,6 +22,8 @@ from pipeline.k8s_probe import (  # noqa: E402
     parse_k8s_semver, compare_k8s_versions, match_k8s_cves,
     load_k8s_cve_snapshot, probe_k8s_surface, is_nodeport,
     extract_kubelet_version, classify_pod_escape, k8s_cve_pairs,
+    classify_etcd_health, classify_etcd_metrics,
+    extract_manifest_config_digest, classify_registry_secrets,
 )
 
 
@@ -450,6 +452,90 @@ def test_k8s_cve_pairs_direct_and_proxy():
     assert all("proxy" in p["source"] for p in pairs2 if p["product"] != "kube-apiserver")
     # 3) sürüm sinyali yoksa çift yok (uydurma eşleme yok)
     assert k8s_cve_pairs([{"product": "etcd"}]) == []
+
+
+# ---- etcd v3 yüzeyi + registry imaj-içi sır taraması ----
+
+class EtcdOpen:
+    """etcd 2379 anon açık: sürüm + v3 /health + /metrics sızdırıyor (v2 kapalı)."""
+    async def get(self, url, timeout=None):
+        if url.endswith("/version"):
+            return _R(200, '{"etcdserver":"3.5.9","etcdcluster":"3.5.9"}')
+        if url.endswith("/health"):
+            return _R(200, '{"health":"true","reason":""}')
+        if url.endswith("/metrics"):
+            return _R(200, 'etcd_server_version{server_version="3.5.9"} 1\n'
+                           "etcd_mvcc_db_total_size_in_bytes 1.048e+07\n"
+                           "etcd_debugging_mvcc_keys_total 123\n")
+        return _R(404, "not found")
+
+
+class RegistryWithSecrets(NodePortFarmRegistry):
+    """Anon katalog + imaj config'inde GÖMÜLÜ SIR taşıyan private registry."""
+    async def get(self, url, timeout=None):
+        if "/v2/_catalog" in url:
+            return _R2(200, '{"repositories":["internal/api"]}', {})
+        if url.endswith("/tags/list"):
+            return _R2(200, '{"name":"internal/api","tags":["1.2.0"]}', {})
+        if "/manifests/" in url:
+            return _R2(200, '{"schemaVersion":2,"config":{"digest":"sha256:abc123"},"layers":[]}', {})
+        if "/blobs/sha256:abc123" in url:
+            return _R2(200, '{"config":{"Env":["AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG",'
+                            '"PATH=/usr/bin"]},"history":[{"created_by":"ENV DB_PASSWORD=Sup3rS3cret99"}]}', {})
+        return _R2(404, "404", {"Docker-Distribution-Api-Version": "registry/2.0"})
+
+
+def test_classify_etcd_health_and_metrics():
+    h = classify_etcd_health(200, '{"health":"true","reason":""}')
+    assert h and h["kind"] == "etcd_v3_health" and h["healthy"] is True
+    assert classify_etcd_health(200, "<html>nope</html>") is None
+    m = classify_etcd_metrics(200, 'etcd_server_version{server_version="3.5.9"} 1\n'
+                                   "etcd_mvcc_db_total_size_in_bytes 1.048e+07\n"
+                                   "etcd_debugging_mvcc_keys_total 123\n")
+    assert m and m["version"] == "3.5.9" and m["keys"] == 123 and m["db_bytes"] == 10480000
+    assert classify_etcd_metrics(200, "düz metin") is None
+
+
+def test_registry_secret_classifier_masks_values():
+    body = ('{"config":{"Env":["AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI","PATH=/usr/bin"]},'
+            '"history":[{"created_by":"ENV DB_PASSWORD=Sup3rS3cret99"}]}')
+    secs = classify_registry_secrets(body)
+    keys = {s["key"] for s in secs}
+    assert {"AWS_SECRET_ACCESS_KEY", "DB_PASSWORD"} <= keys
+    assert "PATH" not in keys
+    joined = str(secs)
+    assert "wJalrXUtnFEMI" not in joined and "Sup3rS3cret99" not in joined  # MASKE zorunlu
+    assert all(s["masked_value"].endswith(")") and "***" in s["masked_value"] for s in secs)
+    assert classify_registry_secrets('{"config":{"Env":["PATH=/usr/bin"]}}') == []
+
+
+def test_extract_manifest_config_digest():
+    d = extract_manifest_config_digest(
+        '{"config":{"mediaType":"x","digest":"sha256:deadbeef","size":1}}')
+    assert d == "sha256:deadbeef"
+    assert extract_manifest_config_digest("{}") is None
+
+
+def test_probe_etcd_v3_surface():
+    findings = asyncio.run(probe_kubernetes("etcd.io", [2379], EtcdOpen()))
+    titles = " ".join(f["title"] for f in findings)
+    assert "etcd v3 API Yüzeyi" in titles and "Metrik" in titles
+    assert any(f.get("product") == "etcd" and f.get("version") == "3.5.9" for f in findings)
+    # v3 /health + /metrics imzaları deterministik → confirmed (sürüm-imzası bulgusu
+    # 'Dış Ağa Açık' ise tasarıma göre probable kalır — aktif sızıntı kanıtı değil)
+    v3 = next(f for f in findings if "v3 API Yüzeyi" in f["title"])
+    assert v3["confidence_tier"] == "confirmed"
+
+
+def test_registry_config_secret_exposure():
+    findings, _hits = asyncio.run(probe_k8s_surface("farm3.io", [30250], RegistryWithSecrets()))
+    titles = " ".join(f["title"] for f in findings)
+    assert "Katalog" in titles                      # anon katalog (critical)
+    assert "Gömülü Sır" in titles                   # imaj config'inde sır (high)
+    secret = next(f for f in findings if "Gömülü Sır" in f["title"])
+    assert "AWS_SECRET_ACCESS_KEY" in secret["proof"]
+    assert "wJalrXUtnFEMI" not in secret["proof"] and "Sup3rS3cret99" not in secret["proof"]
+    assert secret["verification_method"] == "registry-config-scan"
 
 
 if __name__ == "__main__":
