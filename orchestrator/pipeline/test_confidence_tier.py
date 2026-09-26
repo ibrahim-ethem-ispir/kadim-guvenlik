@@ -153,17 +153,24 @@ def test_classify_by_cwe():
     assert classify_evidence_class({"cwe": ["CWE-22"]}) == "lfi"
     assert classify_evidence_class({"cwe": ["CWE-601"]}) == "open_redirect"
     assert classify_evidence_class({"cwe": ["CWE-1336"]}) == "ssti"
+    # T2-B: RCE/SSRF/XXE artık AKTİF doğrulayıcılı sınıf (echo-marker / OAST)
+    assert classify_evidence_class({"cwe": ["CWE-78"]}) == "rce"
+    assert classify_evidence_class({"cwe": ["CWE-918"]}) == "ssrf"
+    assert classify_evidence_class({"cwe": ["CWE-611"]}) == "xxe"
 
 
 def test_classify_by_title():
     assert classify_evidence_class({"title": "Reflected Cross-Site Scripting"}) == "xss"
     assert classify_evidence_class({"title": "Open Redirect in next param"}) == "open_redirect"
     assert classify_evidence_class({"title": "Path Traversal"}) == "lfi"
+    assert classify_evidence_class({"title": "Remote Code Execution"}) == "rce"
 
 
 def test_classify_unknown_none():
-    # RCE/SSRF gibi deterministik doğrulayıcısı olmayan sınıf → None (unconfirmed kalır)
-    assert classify_evidence_class({"title": "Remote Code Execution", "cwe": ["CWE-78"]}) is None
+    # Doğrulayıcısı OLMAYAN sınıflar → None (unconfirmed kalır). NOT: RCE/SSRF/XXE
+    # T2-B ile doğrulayıcıya kavuştu; None beklentisi yalnız karşılıksız sınıflar içindir.
+    assert classify_evidence_class({"title": "IDOR object access", "cwe": ["CWE-639"]}) is None
+    assert classify_evidence_class({"title": "Bilinmeyen zafiyet sınıfı"}) is None
     assert classify_evidence_class({}) is None
 
 

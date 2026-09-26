@@ -222,7 +222,7 @@ def classify_evidence_class(evidence: Dict[str, Any]) -> Optional[str]:
 
     Önce CWE (en güvenilir; nuclei classification'dan gelir), yoksa başlık/proof/mitre
     anahtar kelimeleri. Eşleşme yoksa None → bu bulgunun deterministik doğrulayıcısı yok
-    (RCE/SSRF/IDOR vb.), tier 'unconfirmed' kalır. SAF — I/O yok."""
+    (IDOR/BOLA, CSRF vb.), tier 'unconfirmed' kalır. SAF — I/O yok."""
     cwe = evidence.get("cwe") or []
     cwe_list = cwe if isinstance(cwe, list) else [cwe]
     for c in cwe_list:
@@ -1809,6 +1809,15 @@ async def verify_ssrf(url: str, param: Optional[str], client: httpx.AsyncClient,
                 except Exception:
                     pass
 
+    # MOCK-MOD ANLIK ONAY (izole test/CI): mock transport geri aramayı SENKRON kaydeder;
+    # gerçek modda callback asenkron gelir — orada tur-sonu _poll_oast_callbacks yeter.
+    if oast_client is not None and getattr(oast_client, "mock_mode", False):
+        for hit in await oast_client.poll_interactions():
+            if getattr(hit, "marker", "") == "ssrf":
+                proof = (f"OAST sunucusuna {hit.protocol.upper()} geri araması ulaştı. "
+                         f"Kaynak Backend IP: {hit.remote_address}, Token: {hit.full_id}")
+                return Verdict(True, 0.95, "ssrf-oast", proof, severity="high")
+
     # 2. In-band metadata denemesi (AWS/GCP/Azure)
     for pname in candidates[:5]:
         for target in _SSRF_TARGETS:
@@ -1885,6 +1894,14 @@ async def verify_xxe(url: str, client: httpx.AsyncClient, *, method: str = "post
                                  headers=req_headers, timeout=8.0)
         except Exception:
             pass
+
+    # MOCK-MOD ANLIK ONAY (izole test/CI) — verify_ssrf ile aynı gerekçe.
+    if oast_client is not None and getattr(oast_client, "mock_mode", False):
+        for hit in await oast_client.poll_interactions():
+            if getattr(hit, "marker", "") == "xxe":
+                proof = (f"OAST sunucusuna {hit.protocol.upper()} geri araması ulaştı. "
+                         f"Kaynak Backend IP: {hit.remote_address}, Token: {hit.full_id}")
+                return Verdict(True, 0.95, "xxe-oast", proof, severity="critical")
 
     # 2. In-band dosya okuma denemesi
     for tmpl in _XXE_PAYLOADS:

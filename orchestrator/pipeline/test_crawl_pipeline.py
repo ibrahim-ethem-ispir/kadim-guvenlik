@@ -6,6 +6,11 @@ dogrular. "Standart zafiyeti 1 tık buluyoruz" tavanının kapandigi noktadir.
 Çalistir: python3 -m pipeline.test_crawl_pipeline
 """
 import asyncio
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
 from pipeline.attack_graph import Graph, NodeType, NodeState, EDGE_COST_TABLE, siege_score, THRESHOLD
 
 

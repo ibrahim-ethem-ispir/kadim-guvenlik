@@ -1071,18 +1071,22 @@ class _OutOfScopeRedirect(Exception):
     (kapsam dışı hedeften veri toplanmaz, dış host'a yönlendiren yollar tutarsız sonuç üretmez)."""
 
 
-def _scope_guard_hook(target_host: str) -> Callable[[httpx.Response], None]:
+def _scope_guard_hook(target_host: str) -> Callable[[httpx.Response], Any]:
     """follow_redirects=True iken redirect zincirinin HEPSİ hedef host (veya alt
     domain'i) üstünde kalmasını zorunlu kılar. NEDEN: dış host'a açılan redirect
     (open-redirect istismari değil — bizim aracımızın DIŞARI sürüklenmesi) kanıtı
     kirletir: dış sunucunun 200'ü hedefin 'ifşası' gibi görünür, dış hedefte sonuç
     TUTARSIZLAŞIR (hangi CDN'e düşerse oradan yanıt döner). httpx event-hooks
-    'response' kancası her ara yanıtta (redirect adımları dahil) çağrılır."""
+    'response' kancası her ara yanıtta (redirect adımları dahil) çağrılır.
+    NOT: httpx AsyncClient kancaları ASYNC olmalıdır (await hook(response)) — senkron
+    hook `await None` ile HER isteği sessizce patlatır, tarama boş dönerdi."""
     th = (target_host or "").strip().lower().lstrip(".")
     if not th:
-        return lambda response: None
+        async def _noop(response: httpx.Response) -> None:
+            return None
+        return _noop
 
-    def _hook(response: httpx.Response) -> None:
+    async def _hook(response: httpx.Response) -> None:
         try:
             rh = (response.request.url.host or "").lower()
         except Exception:

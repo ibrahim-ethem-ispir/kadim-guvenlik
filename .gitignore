@@ -11,3 +11,16 @@ services/*/target
 # AI red-team sürekli ölçüm — çalışma-zamanı çıktıları (CI yeniden üretir; baseline commit'lenir)
 scripts/ai_redteam_history.json
 scripts/ai_redteam_scoreboard.html
+# Python ortamları / önbellek
+.venv/
+venv/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+# Log + arşiv + dump artefaktları
+*.log
+*.tar.gz
+*.dump
+# Node / Rust build artefaktları
+node_modules/
+target/

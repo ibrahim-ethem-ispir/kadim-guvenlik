@@ -187,21 +187,22 @@ class _FakeResp:
 
 def test_scope_guard_same_host_and_subdomain_pass():
     hook = _scope_guard_hook("victim.test")
-    hook(_FakeResp("victim.test"))       # aynı host → sessiz
-    hook(_FakeResp("app.victim.test"))   # alt domain → sessiz
+    asyncio.run(hook(_FakeResp("victim.test")))       # aynı host → sessiz
+    asyncio.run(hook(_FakeResp("app.victim.test")))   # alt domain → sessiz
 
 
 def test_scope_guard_external_host_blocked():
     hook = _scope_guard_hook("victim.test")
     try:
-        hook(_FakeResp("evil-cdn.example"))
+        asyncio.run(hook(_FakeResp("evil-cdn.example")))
         raise AssertionError("dış host redirect'i kesilmeliydi (_OutOfScopeRedirect beklenir)")
     except _OutOfScopeRedirect:
         pass  # doğru davranış
 
 
 def test_scope_guard_empty_target_noop():
-    _scope_guard_hook("")(_FakeResp("herhangi.com"))  # hedef yok → kural yok, patlamaz
+    # hedef yok → kural yok, patlamaz (httpx AsyncClient kancası ASYNC olduğu için await'li)
+    asyncio.run(_scope_guard_hook("")(_FakeResp("herhangi.com")))
 
 
 # ---- 6) stage_health (degraded) — 'failed'/'timeout' görünür kalır ----

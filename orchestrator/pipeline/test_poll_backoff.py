@@ -8,6 +8,10 @@ vazgeçmediğini izole doğrular. Sleep'ler minik interval ile hızlandırılır
 Çalıştır: python3 -m pipeline.test_poll_backoff
 """
 import asyncio
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from pipeline.scan_pipeline_v2 import poll_with_backoff
 

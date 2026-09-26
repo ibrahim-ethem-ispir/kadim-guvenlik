@@ -7,8 +7,11 @@ playbook _is_appliance gating.
     PYTHONPATH=orchestrator python3 orchestrator/pipeline/test_appliance_probe.py
 """
 import asyncio
+import os
 import re
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from pipeline.appliance_probe import (
     identify_appliance, classify_appliance_response, probe_appliance,

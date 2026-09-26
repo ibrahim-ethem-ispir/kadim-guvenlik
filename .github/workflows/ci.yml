@@ -1,0 +1,55 @@
+# Türkçe: Sürekli doğrulama — test suite (düz script) + frontend build + compose şeması.
+# Doktrin: testler çevrimdışıdır (ağ/DB/LLM yok); CI'da ek servis gerekmez.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    name: Python test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bağımlılıklar
+        run: |
+          pip install -r orchestrator/requirements.txt
+          pip install -r services/ai-service/requirements.txt
+      - name: Testler (düz script — pytest yok)
+        run: bash scripts/run_tests.sh
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  compose:
+    name: docker compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Şema doğrulama (zorunlu sırlar sahte değerle)
+        run: docker compose config --quiet
+        env:
+          MONGO_USER: ci
+          MONGO_PASS: ci-only-fake-secret-32-chars-minimum!!
+          JWT_SECRET: ci-only-fake-secret-32-chars-minimum!!

@@ -126,11 +126,14 @@ def classify_distro(version: Optional[str]) -> Optional[str]:
 
 
 def classify_kubelet_denied(status: int, body: str) -> Optional[Dict[str, Any]]:
-    """kubelet REDDETME imzası (SAF): 401/403 + gövdede 'Unauthorized' (kubelet'nin ayırt
-    edici JSON hatası {"error":"Unauthorized"}). Kimlik doğrulanmış saldırı yüzeyi kaydı
-    için — generic web 401'i (HTML login) eşleşmez; imza zorunlu, FP koruması."""
+    """kubelet REDDETME imzası (SAF): 401/403 + gövdede 'Unauthorized'. İki imza kabul:
+    JSON hata ({"error":"Unauthorized"}) ve düz metin ('Unauthorized' — eski kubelet /
+    read-only port). Generic web 401'i (HTML login sayfası) EŞLEŞMEZ — HTML gövde
+    FP korumasıyla elenir; imza zorunlu."""
     body = (body or "").lower()
-    if status in (401, 403) and "unauthorized" in body and "error" in body:
+    if status in (401, 403) and "unauthorized" in body:
+        if "<html" in body or "<!doctype" in body:
+            return None  # generic web/login sayfası — kubelet imzası değil
         return {"kind": "kubelet_denied"}
     return None
 

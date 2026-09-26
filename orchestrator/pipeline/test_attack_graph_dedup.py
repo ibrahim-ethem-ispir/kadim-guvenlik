@@ -5,6 +5,11 @@ bulgusu iki kez, aynı nuclei template'i birden çok kenardan beş kez kanıtlan
 Kurumsal raporda mükerrer bulgu güven kırar — dedup grafın tek otoritesidir.
 """
 
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
 from pipeline.attack_graph import Graph, _canon_host, _canon_url
 
 

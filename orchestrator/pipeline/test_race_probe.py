@@ -46,25 +46,33 @@ async def main():
     assert is_financial_target("https://bank.com/about-us") is False
     print("  ✓ is_financial_target filtrelemesi doğrulandı")
 
-    # 2. Adjudicate testi — Korumasız sunucu (Vulnerable)
+    # 2. Adjudicate testi — Korumasız sunucu (Vulnerable, DURUM-DEĞİŞTİRİCİ metod)
+    # NOT-1: GET/HEAD/OPTIONS idempotenttir — N×2xx BEKLENEN davranıştır, CWE-362 kanıtı
+    # DEĞİLDİR (idempotent-metot FP kapısı). Race iddiası yalnız POST/PUT gibi metotlarda.
+    # NOT-2: tahribatsız gözlem çift harcama kanıtlayamaz → tier en fazla 'probable'.
     mock_responses_vuln = [(200, '{"ok": true}', 0.05) for _ in range(8)]
-    verdict_vuln = adjudicate_concurrency(mock_responses_vuln, "https://api.bank.com/transfer", 8)
+    verdict_vuln = adjudicate_concurrency(mock_responses_vuln, "https://api.bank.com/transfer", 8, method="POST")
     assert verdict_vuln.is_vulnerable is True
-    assert verdict_vuln.confidence_tier == "confirmed"
+    assert verdict_vuln.confidence_tier == "probable"
     assert "CWE-362" in verdict_vuln.title
     print(f"  ✓ Korumasız durum tespit edildi: {verdict_vuln.title}")
 
+    # 2b. İdempotent metot FP kapısı: aynı 8×200 GET ile ASLA zafiyet işaretlemez
+    verdict_get = adjudicate_concurrency(mock_responses_vuln, "https://api.bank.com/transfer", 8, method="GET")
+    assert verdict_get.is_vulnerable is False
+    print("  ✓ İdempotent metot (GET) FP kapısı doğrulandı")
+
     # 3. Adjudicate testi — Korumalı sunucu (Protected)
     mock_responses_prot = [(200, '{"ok": true}', 0.05)] + [(409, '{"error": "locked"}', 0.06) for _ in range(7)]
-    verdict_prot = adjudicate_concurrency(mock_responses_prot, "https://api.bank.com/transfer", 8)
+    verdict_prot = adjudicate_concurrency(mock_responses_prot, "https://api.bank.com/transfer", 8, method="POST")
     assert verdict_prot.is_vulnerable is False
     assert verdict_prot.confidence_tier == "clean"
     assert verdict_prot.replay_protection_found is True
-    print("  ✓ Korumalı durum tespit edildi (Hız limiti / kilit devrede)")
+    print(f"  ✓ Korumalı durum tespit edildi (Hız limiti / kilit devrede)")
 
     # 4. Async Probe uçtan uca test (Mock Transport ile)
     client_vuln = httpx.AsyncClient(transport=MockRaceTransport("vulnerable"))
-    res = await probe_race_condition("https://api.bank.com/transfer", client_vuln, burst_count=6)
+    res = await probe_race_condition("https://api.bank.com/transfer", client_vuln, burst_count=6, method="POST")
     assert res.is_vulnerable is True
     assert res.success_count == 6
     print(f"  ✓ Uçtan uca probe simülasyonu başarılı ({res.success_count} paralel istek yakalandı)")

@@ -1,0 +1,33 @@
+# Türkçe: Dependabot — bağımlılık/güncelleme takibi (7 pip dosyası + npm + docker + actions).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /orchestrator
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /services/ai-service
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /services/crawler-service
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /services/nmap-service
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /services/nuclei-service
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /services/rustscan-service
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /services/subfinder-service
+    schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }

@@ -6,7 +6,10 @@ cve_intel._cpe_product_variants + adaptive_scanner haritası + kev_intel._produc
 Çalıştırma:
     PYTHONPATH=orchestrator python3 orchestrator/pipeline/test_modern_stack_2026.py
 """
+import os
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from pipeline.path_probe import _detect_modern_stack, _MODERN_STACK_SIGNATURES
 from pipeline.target_profile import fingerprint
