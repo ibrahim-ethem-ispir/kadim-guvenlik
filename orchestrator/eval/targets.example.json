@@ -1,0 +1,13 @@
+{
+  "_aciklama": "LLM-katki eval hedef manifesti. YALNIZ YETKILI hedefler koyun (kapsam kapisi AUTHORIZED_TARGETS'i zorlar). 'expected_findings' opsiyoneldir; verilirse precision/recall hesaplanir (bulgu kimligi: 'template-id@matched-at' ya da CVE).",
+  "level": "standard",
+  "targets": [
+    "juice-shop.local",
+    { "target": "dvwa.local", "level": "deep" },
+    {
+      "target": "testphp.vulnweb.local",
+      "level": "standard",
+      "expected_findings": ["CVE-2021-41773@http://testphp.vulnweb.local", "sqli@http://testphp.vulnweb.local/listproducts?cat=1"]
+    }
+  ]
+}

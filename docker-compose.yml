@@ -1,0 +1,468 @@
+name: kadim_platform
+
+# Hepsini durdur + kaldır (temiz başlangıç)
+# docker compose --profile ai --profile tools --profile research down
+#
+# NOT (2026): 7 tarayıcı mikroservisi (nmap, nuclei, subfinder, rustscan, recon,
+# osint, fuzz) artık PROFILE-SIZ — "docker compose up" ile otomatik başlarlar.
+# Çünkü otonom motor (autonomous_engine) HEPSİNE HTTP üzerinden bağımlıdır; biri
+# kapalıysa tarama sessizce BOŞ döner. Sadece opsiyonel AI / hash-cracker /
+# stress / researcher servisleri hâlâ profil arkasında.
+#
+# Opsiyonel AI + yardımcı servisler:
+# docker compose --profile ai --profile tools --profile research up -d --build
+
+# Otonom tarama için yeterli minimum (artık profile gereksinim yok):
+# docker compose up -d --build
+
+services:
+  # ============================================
+  # CORE SERVICES (PROFİLSİZ = her zaman açılır)
+  # Bu servislerde 'profiles:' yoktur; "docker compose up" ile
+  # profil vermeden otomatik başlarlar. Tarama servisleri ise
+  # aşağıda profillidir ve yalnızca profili verilince açılır.
+  # ============================================
+
+  # --- Entry Point (Reverse Proxy) ---
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "5566:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - orchestrator
+      - auth-service
+    networks:
+      - kadim-net
+
+  # --- Frontend (React UI) ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    networks:
+      - kadim-net
+    environment:
+      - VITE_API_URL=/api
+
+  # --- Orchestrator (FastAPI - Brain) ---
+  orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    networks:
+      - kadim-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      # Qdrant best-effort: ayakta olmasa bile orchestrator başlar (vektör hafıza sessiz degrade).
+      qdrant:
+        condition: service_started
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+      # --- Vektör hafıza (Qdrant) — embedding dış API maliyeti olmasın diye varsayılan KAPALI.
+      - VECTOR_MEMORY_ENABLED=${VECTOR_MEMORY_ENABLED:-0}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - VECTOR_EMBED_MODEL=${VECTOR_EMBED_MODEL:-}
+      - VECTOR_EMBED_BASE_URL=${VECTOR_EMBED_BASE_URL:-}
+      # --- Davranış denetimi (loop-guard): aynı aracın eşik üstü tekrarına deterministik
+      # skor cezası + narrate uyarısı. Varsayılan AÇIK; ceza yalnız skor çarpanı, karar akışı aynı.
+      - LOOP_GUARD_ENABLED=${LOOP_GUARD_ENABLED:-1}
+      - LOOP_GUARD_SAME_LIMIT=${LOOP_GUARD_SAME_LIMIT:-5}
+      - LOOP_GUARD_PENALTY=${LOOP_GUARD_PENALTY:-0.55}
+      - NMAP_SERVICE_URL=http://nmap-service:8001
+      - SUBFINDER_SERVICE_URL=http://subfinder-service:8010
+      - RUSTSCAN_SERVICE_URL=http://rustscan-service:8002
+      - NUCLEI_SERVICE_URL=http://nuclei-service:8003
+      - RECON_SERVICE_URL=http://recon-service:8004
+      - OSINT_SERVICE_URL=http://osint-service:8005
+      - HASH_CRACKER_SERVICE_URL=http://hash-cracker:8006
+      - AUTH_SERVICE_URL=http://auth-service:8007
+      - AI_SERVICE_URL=http://ai-service:8009
+      - FUZZ_SERVICE_URL=http://fuzz-service:8011
+      - CRAWLER_SERVICE_URL=http://crawler-service:8012
+      # Madde 2: headless crawl max_pages orchestrator'ın KENDİ env'inden body'ye gider
+      # (scan_pipeline_v2.py _headless_crawl) — yoksa crawler-service 80 olsa da body 25 yazar.
+      - CRAWLER_MAX_PAGES=${CRAWLER_MAX_PAGES:-25}
+      - FINGERPRINT_SERVICE_URL=http://fingerprint-service:8013
+      # vulnx (ProjectDiscovery PDCP) CVE istihbaratı — KEYSİZ çalışır (10/dk). Ücretsiz key
+      # (cloud.projectdiscovery.io) .env'e PDCP_API_KEY olarak konursa limit kalkar.
+      - PDCP_API_KEY=${PDCP_API_KEY:-}
+      - VULNX_INTEL=${VULNX_INTEL:-1}
+      - JWT_SECRET=${JWT_SECRET:-kadim_super_secret_jwt_key_2024_secure_token!}
+      # --- LLM yapılandırması (.env TEK doğruluk kaynağı) — eskiden orchestrator'a HİÇ geçmiyordu.
+      # Otonom motor (auto-scan) + /api/settings/ai/env-status bu değişkenleri okur.
+      - AUTONOMOUS_LLM_PROVIDER=${AUTONOMOUS_LLM_PROVIDER:-ollama}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - AUTONOMOUS_MODEL=${AUTONOMOUS_MODEL:-hf.co/empero-ai/Qwythos-9B-v2-GGUF:Q4_K_M}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      # Rapor/Analiz (ai-service) varsayılanı — env-status için orchestrator da bilir.
+      - AI_SERVICE_LLM_PROVIDER=${AI_SERVICE_LLM_PROVIDER:-ollama}
+      - AI_SERVICE_LLM_MODEL=${AI_SERVICE_LLM_MODEL:-}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-3-5-sonnet-latest}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+    volumes:
+      - ./files:/app/files
+
+  # --- Database: MongoDB 8.0+ (Vector Search Destekli) ---
+  mongodb:
+    image: mongo:8.0.20
+    container_name: kadim-mongodb
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-kadim}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-kadim_secure_2024}
+      MONGO_INITDB_DATABASE: kadim_osint
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - kadim-net
+    restart: unless-stopped
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Vektör DB: Qdrant (semantik hafıza — scan_memories/evidence/payload benzerlik araması) ---
+  # Neden Qdrant: tek hafif konteyner, filtreli HNSW (hedef/teknoloji/severity süzerek benzerlik),
+  # Mongo'ya dokunmaz; düşerse motor best-effort sürer (VECTOR_MEMORY_ENABLED ile tamamen kapatılabilir).
+  # Port yalnız localhost'a bağlanır — dışa AÇIK DEĞİL, sadece iç ağ (kadim-net) + yerel debug.
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: kadim-qdrant
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - ./files/qdrant:/qdrant/storage
+    networks:
+      - kadim-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Auth Service (Rust) ---
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: kadim-auth
+    ports:
+      - "8007:8007"
+    environment:
+      - RUST_LOG=info
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+      - JWT_SECRET=${JWT_SECRET:-kadim_super_secret_jwt_key_2024_secure_token!}
+      - REGISTER_ENABLED=${REGISTER_ENABLED:-true}
+      - AUTO_ACTIVATE_USERS=${AUTO_ACTIVATE_USERS:-true}
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5566,https://dev.example-corp.com
+      - PORT=8007
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - kadim-net
+    restart: unless-stopped
+
+  # ============================================
+  # AI SERVICE (Profil: ai)
+  # Yapay zeka analiz servisi
+  # ============================================
+
+  ai-service:
+    # profiles: ["ai"]
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: kadim-ai
+    environment:
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-3-5-sonnet-latest}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      # --- DeepSeek (yeni sağlayıcı) + ai-service varsayılan provider/model (.env) ---
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      - AI_SERVICE_LLM_PROVIDER=${AI_SERVICE_LLM_PROVIDER:-ollama}
+      - AI_SERVICE_LLM_MODEL=${AI_SERVICE_LLM_MODEL:-}
+      - AUTONOMOUS_MODEL=${AUTONOMOUS_MODEL:-hf.co/empero-ai/Qwythos-9B-v2-GGUF:Q4_K_M}
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+      - ORCHESTRATOR_URL=http://orchestrator:8000
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - kadim-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ============================================
+  # PORT SCANNING SERVICES (Profil: port-scan)
+  # Port tarama servisleri
+  # ============================================
+
+  # --- Nmap Service (Python) ---
+  # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
+  nmap-service:
+    build:
+      context: ./services/nmap-service
+      dockerfile: Dockerfile
+    networks:
+      - kadim-net
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - nmap-logs:/app/logs
+    restart: unless-stopped
+
+  # --- RustScan Service (Python) ---
+  # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
+  rustscan-service:
+    build:
+      context: ./services/rustscan-service
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    networks:
+      - kadim-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    restart: unless-stopped
+
+  # ============================================
+  # VULNERABILITY SCANNING (Profil: vuln-scan)
+  # Zafiyet tarama servisleri
+  # ============================================
+
+  # --- Nuclei Service (Python) ---
+  # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
+  nuclei-service:
+    build:
+      context: ./services/nuclei-service
+      dockerfile: Dockerfile
+    networks:
+      - kadim-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+    volumes:
+      - nuclei-logs:/app/logs
+      - nuclei-templates:/root/nuclei-templates
+
+  # ============================================
+  # RECON SERVICES (Profil: recon)
+  # Keşif ve istihbarat servisleri
+  # ============================================
+
+  # --- Subfinder Service (Python) ---
+  # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
+  subfinder-service:
+    build:
+      context: ./services/subfinder-service
+      dockerfile: Dockerfile
+    networks:
+      - kadim-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+    restart: unless-stopped
+
+  # --- Recon Intelligence Service (Rust) ---
+  # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
+  recon-service:
+    build:
+      context: ./services/recon-service
+      dockerfile: Dockerfile
+    networks:
+      - kadim-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+      - RUST_LOG=info
+    volumes:
+      - recon-logs:/app/log
+      - ./files:/app/files
+
+  # --- OSINT Service (Rust) ---
+  # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
+  osint-service:
+    build:
+      context: ./services/osint-service
+      dockerfile: Dockerfile
+    container_name: kadim-osint
+    environment:
+      RUST_LOG: info
+      MONGODB_URI: mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      ORCHESTRATOR_URL: http://orchestrator:8000
+      PORT: 8005
+      SHODAN_API_KEY: ${SHODAN_API_KEY:-}
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - kadim-net
+    restart: unless-stopped
+
+  # ============================================
+  # TOOLS (Profil: tools)
+  # Yardımcı araçlar
+  # ============================================
+
+  # --- Hash Cracker (Rust) ---
+  hash-cracker:
+    profiles: ["tools"]
+    build:
+      context: ./services/hash-cracker
+      dockerfile: Dockerfile
+    networks:
+      - kadim-net
+    volumes:
+      - ./files:/app/files
+    environment:
+      - RUST_LOG=info
+
+  # --- Fuzz Service (Rust + Feroxbuster) ---
+  # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
+  fuzz-service:
+    build:
+      context: ./services/fuzz-service-rs
+      dockerfile: Dockerfile
+    container_name: kadim-fuzz
+    ports:
+      - "8011:8011"
+    environment:
+      - RUST_LOG=info
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+      - OSINT_DATABASE=kadim_osint
+      - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
+      - WORDLIST_PATH=/app/files
+    volumes:
+      - ./files:/app/files
+    networks:
+      - kadim-net
+    restart: unless-stopped
+
+  # T1-A: Headless (JS-render) crawler — SPA yüzeyini gerçek tarayıcıyla keşfeder.
+  # Orchestrator crawl'ı bunu augment olarak kullanır; erişilemezse httpx crawler'a düşer.
+  crawler-service:
+    build:
+      context: ./services/crawler-service
+      dockerfile: Dockerfile
+    container_name: kadim-crawler
+    ports:
+      - "8012:8012"
+    environment:
+      - CRAWLER_MAX_PAGES=${CRAWLER_MAX_PAGES:-25}
+      - CRAWLER_BUDGET_S=${CRAWLER_BUDGET_S:-90}
+    networks:
+      - kadim-net
+    restart: unless-stopped
+
+  # --- Parmak İzi (Fingerprint) Servisi (Go / wappalyzergo) ---
+  # Teknoloji KİMLİĞİ: binlerce güncel Wappalyzer imzası (isim/sürüm/kategori/CPE). Elle
+  # bakımı çürüyen 142-imzalık Rust tespitinin yerini alan "kiralık motor+veri" → go get -u.
+  # Degrade-safe: orchestrator erişemezse mevcut header/Rust sezgisi kural-fallback kalır.
+  fingerprint-service:
+    build:
+      context: ./services/fingerprint-service
+      dockerfile: Dockerfile
+    container_name: kadim-fingerprint
+    environment:
+      - PORT=8013
+    networks:
+      - kadim-net
+    restart: unless-stopped
+
+  # --- Stress Testing Service (Rust) ---
+  stress-service:
+    profiles: ["tools"]
+    build:
+      context: ./services/stress-service
+      dockerfile: Dockerfile
+    container_name: kadim-stress
+    ports:
+      - "8012:8012"
+    environment:
+      - RUST_LOG=info
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_DATABASE=kadim_security
+    networks:
+      - kadim-net
+    restart: unless-stopped
+
+
+  # ============================================
+  # RESEARCH (Profil: research)
+  # Araştırma servisleri
+  # ============================================
+
+  # --- Zero-Day Researcher Service (Rust) ---
+  researcher-service:
+    profiles: ["research"]
+    build:
+      context: ./services/researcher-service
+      dockerfile: Dockerfile
+    container_name: kadim-researcher
+    environment:
+      RUST_LOG: info
+      PORT: 8008
+      MONGODB_URI: mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      MONGODB_DATABASE: kadim_security
+      RECON_SERVICE_URL: http://recon-service:8004
+      OSINT_SERVICE_URL: http://osint-service:8005
+      NUCLEI_SERVICE_URL: http://nuclei-service:8003
+      HEADLESS_BROWSER_ENABLED: "true"
+      SCAN_TIMEOUT_SECS: "300"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - kadim-net
+    restart: unless-stopped
+
+networks:
+  kadim-net:
+    driver: bridge
+    internal: false
+
+volumes:
+  nmap-logs:
+  nuclei-logs:
+  recon-logs:
+  nuclei-templates:
+  mongo-data:

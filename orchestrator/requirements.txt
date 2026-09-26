@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+httpx
+
+pydantic
+websockets
+pymongo
+pyjwt
+qdrant-client

@@ -1,0 +1,725 @@
+{
+ "generated_at": "2026-09-25",
+ "source": "Kubernetes resmî CVE feed'i — github.com/kubernetes/kubernetes issue'ları label:official-cve-feed (Security Response Committee duyuruları). Üretim: scripts/extract_k8s_cve_snapshot.py",
+ "match_semantics": "fixed_in: {minor: fixed_version}. Eşleşen minor'da version < fixed → zaafiyetli; minor > en büyük fixed minor → yamalı; minor < en küçük fixed minor → zaafiyetli (fix penceresi öncesi dal, danışmanın 'affected' listesiyle çapraz kontrol edilmeli).",
+ "entries": [
+  {
+   "cve": "CVE-2026-76654",
+   "title": "Subpath symlinking on Windows nodes permits NTLM coercion",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": 5.8,
+   "windows_only": true,
+   "fixed_in": {
+    "1.34": "1.34.12",
+    "1.35": "1.35.9",
+    "1.36": "1.36.5",
+    "1.37": "1.37.1"
+   },
+   "affected": [
+    "kubelet: <= v1.34.11",
+    "kubelet: <= v1.35.8",
+    "kubelet: <= v1.36.4",
+    "kubelet: = v1.37.0"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/142098"
+  },
+  {
+   "cve": "CVE-2026-2270",
+   "title": "StatefulSet and ControllerRevision write permissions allow cross-namespace pod creation",
+   "components": [
+    "kube-controller-manager"
+   ],
+   "severity": "medium",
+   "cvss3": 5.9,
+   "windows_only": false,
+   "fixed_in": {
+    "1.34": "1.34.12",
+    "1.35": "1.35.9",
+    "1.36": "1.36.5",
+    "1.37": "1.37.1"
+   },
+   "affected": [
+    "kube-controller-manager: <= v1.34.11",
+    "kube-controller-manager: <= v1.35.8",
+    "kube-controller-manager: <= v1.36.4",
+    "kube-controller-manager: = v1.37.0"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/142097"
+  },
+  {
+   "cve": "CVE-2025-5187",
+   "title": "Nodes can delete themselves by adding an OwnerReference",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": 6.7,
+   "windows_only": false,
+   "fixed_in": {
+    "1.31": "1.31.12",
+    "1.32": "1.32.8",
+    "1.33": "1.33.4"
+   },
+   "affected": [
+    "kube-apiserver: <= v1.31.11",
+    "kube-apiserver: <= v1.32.7",
+    "kube-apiserver: <= v1.33.3"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/133471"
+  },
+  {
+   "cve": "CVE-2025-4563",
+   "title": "Nodes can bypass dynamic resource allocation authorization checks",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.32": "1.32.6",
+    "1.33": "1.33.2"
+   },
+   "affected": [
+    "kube-apiserver: v1.32.0 - v1.32.5",
+    "kube-apiserver: v1.33.0 - 1.33.1"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/132151"
+  },
+  {
+   "cve": "CVE-2025-13281",
+   "title": "Portworx Half-Blind SSRF in kube-controller-manager",
+   "components": [
+    "kube-controller-manager"
+   ],
+   "severity": "medium",
+   "cvss3": 5.8,
+   "windows_only": false,
+   "fixed_in": {
+    "1.32": "1.32.10",
+    "1.33": "1.33.6",
+    "1.34": "1.34.2"
+   },
+   "affected": [
+    "kube-controller-manager: <= v1.30.14",
+    "kube-controller-manager: <= v1.31.14",
+    "kube-controller-manager: <= v1.32.9",
+    "kube-controller-manager: <= v1.33.5",
+    "kube-controller-manager: <= v1.34.1"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/135525"
+  },
+  {
+   "cve": "CVE-2025-0426",
+   "title": "Node Denial of Service via kubelet Checkpoint API",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.32": "1.32.2",
+    "1.31": "1.31.6",
+    "1.30": "1.30.10",
+    "1.29": "1.29.14"
+   },
+   "affected": [
+    "kubelet v1.32.0 to v1.32.1",
+    "kubelet v1.31.0 to v1.31.5",
+    "kubelet v1.30.0 to v1.30.9"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/130016"
+  },
+  {
+   "cve": "CVE-2024-9042",
+   "title": "Command Injection affecting Windows nodes via nodes/*/logs/query API",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": true,
+   "fixed_in": {
+    "1.32": "1.32.1",
+    "1.31": "1.31.5",
+    "1.30": "1.30.9",
+    "1.29": "1.29.13"
+   },
+   "affected": [
+    "v1.32.0",
+    "v1.31.0 to v1.31.4",
+    "v1.30.0 to v1.30.8",
+    "<=v1.29.12"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/129654"
+  },
+  {
+   "cve": "CVE-2024-5321",
+   "title": "Incorrect permissions on Windows containers logs",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": true,
+   "fixed_in": {
+    "1.27": "1.27.16",
+    "1.28": "1.28.12",
+    "1.29": "1.29.7",
+    "1.30": "1.30.3"
+   },
+   "affected": [
+    "kubelet <= 1.27.15",
+    "kubelet <= 1.28.11",
+    "kubelet <= 1.29.6",
+    "kubelet <= 1.30.2"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/126161"
+  },
+  {
+   "cve": "CVE-2024-3177",
+   "title": "Bypassing mountable secrets policy imposed by the ServiceAccount admission plugin",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.29": "1.29.4",
+    "1.28": "1.28.9",
+    "1.27": "1.27.13"
+   },
+   "affected": [
+    "kube-apiserver v1.29.0 - v1.29.3",
+    "kube-apiserver v1.28.0 - v1.28.8",
+    "kube-apiserver <= v1.27.12"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/124336"
+  },
+  {
+   "cve": "CVE-2024-10220",
+   "title": "Arbitrary command execution through gitRepo volume",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "high",
+   "cvss3": 8.1,
+   "windows_only": false,
+   "fixed_in": {
+    "1.31": "1.31.0",
+    "1.30": "1.30.3",
+    "1.29": "1.29.7",
+    "1.28": "1.28.12"
+   },
+   "affected": [
+    "kubelet v1.30.0 to v1.30.2",
+    "kubelet v1.29.0 to v1.29.6",
+    "kubelet <= v1.28.11"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/128885"
+  },
+  {
+   "cve": "CVE-2023-5528",
+   "title": "Insufficient input sanitization in in-tree storage plugin leads to privilege escalation on Windows nodes",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": true,
+   "fixed_in": {
+    "1.28": "1.28.4",
+    "1.27": "1.27.8",
+    "1.26": "1.26.11",
+    "1.25": "1.25.16"
+   },
+   "affected": [
+    "kubelet >= v1.8.0 (including all later minor versions)"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/121879"
+  },
+  {
+   "cve": "CVE-2023-3955",
+   "title": "Insufficient input sanitization on Windows nodes leads to privilege escalation",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": true,
+   "fixed_in": {
+    "1.28": "1.28.1",
+    "1.27": "1.27.5",
+    "1.26": "1.26.8",
+    "1.25": "1.25.13",
+    "1.24": "1.24.17"
+   },
+   "affected": [
+    "kubelet <= v1.28.0",
+    "kubelet <= v1.27.4",
+    "kubelet <= v1.26.7",
+    "kubelet <= v1.25.12",
+    "kubelet <= v1.24.16"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/119595"
+  },
+  {
+   "cve": "CVE-2023-3676",
+   "title": "Insufficient input sanitization on Windows nodes leads to privilege escalation",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": true,
+   "fixed_in": {
+    "1.28": "1.28.1",
+    "1.27": "1.27.5",
+    "1.26": "1.26.8",
+    "1.25": "1.25.13",
+    "1.24": "1.24.17"
+   },
+   "affected": [
+    "kubelet <= v1.28.0",
+    "kubelet <= v1.27.4",
+    "kubelet <= v1.26.7",
+    "kubelet <= v1.25.12",
+    "kubelet <= v1.24.16"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/119339"
+  },
+  {
+   "cve": "CVE-2023-2727",
+   "title": "Bypassing policies imposed by the ImagePolicyWebhook and bypassing mountable secrets policy imposed by the ServiceAccount admission plugin",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.27": "1.27.3",
+    "1.26": "1.26.6",
+    "1.25": "1.25.11",
+    "1.24": "1.24.15"
+   },
+   "affected": [
+    "kube-apiserver v1.27.0 - v1.27.2",
+    "kube-apiserver v1.26.0 - v1.26.5",
+    "kube-apiserver v1.25.0 - v1.25.10",
+    "kube-apiserver <= v1.24.14"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/118640"
+  },
+  {
+   "cve": "CVE-2022-3294",
+   "title": "Node address isn't always verified when proxying",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.25": "1.25.4",
+    "1.24": "1.24.8",
+    "1.23": "1.23.14",
+    "1.22": "1.22.16"
+   },
+   "affected": [
+    "Kubernetes kube-apiserver <= v1.25.3",
+    "Kubernetes kube-apiserver <= v1.24.7",
+    "Kubernetes kube-apiserver <= v1.23.13",
+    "Kubernetes kube-apiserver <= v1.22.15"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/113757"
+  },
+  {
+   "cve": "CVE-2022-3172",
+   "title": "Aggregated API server can cause clients to be redirected (SSRF)",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.25": "1.25.1",
+    "1.24": "1.24.5",
+    "1.23": "1.23.11",
+    "1.22": "1.22.14"
+   },
+   "affected": [
+    "kube-apiserver v1.25.0",
+    "kube-apiserver v1.24.0 - v1.24.4",
+    "kube-apiserver v1.23.0 - v1.23.10",
+    "kube-apiserver v1.22.0 - v1.22.13",
+    "kube-apiserver <= v1.21.14"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/112513"
+  },
+  {
+   "cve": "CVE-2022-3162",
+   "title": "Unauthorized read of Custom Resources",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.25": "1.25.4",
+    "1.24": "1.24.8",
+    "1.23": "1.23.14",
+    "1.22": "1.22.16"
+   },
+   "affected": [
+    "Kubernetes kube-apiserver <= v1.25.3",
+    "Kubernetes kube-apiserver <= v1.24.7",
+    "Kubernetes kube-apiserver <= v1.23.13",
+    "Kubernetes kube-apiserver <= v1.22.15"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/113756"
+  },
+  {
+   "cve": "CVE-2021-25749",
+   "title": "`runAsNonRoot` logic bypass for Windows containers",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "low",
+   "cvss3": null,
+   "windows_only": true,
+   "fixed_in": {
+    "1.22": "1.22.14",
+    "1.23": "1.23.11",
+    "1.24": "1.24.5",
+    "1.25": "1.25.0"
+   },
+   "affected": [
+    "kubelet v1.20 - v1.21",
+    "kubelet v1.22.0 - v1.22.13",
+    "kubelet v1.23.0 - v1.23.10",
+    "kubelet v1.24.0 - v1.24.4"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/112192"
+  },
+  {
+   "cve": "CVE-2021-25748",
+   "title": "Ingress-nginx `path` sanitization can be bypassed with newline character",
+   "components": [
+    "kubectl"
+   ],
+   "severity": "high",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.2": "1.2.1"
+   },
+   "affected": [
+    "<v1.2.1"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/126814"
+  },
+  {
+   "cve": "CVE-2021-25746",
+   "title": "Ingress-nginx directive injection via annotations",
+   "components": [
+    "kubectl"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.2": "1.2.0"
+   },
+   "affected": [
+    "<v1.2.0"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/126813"
+  },
+  {
+   "cve": "CVE-2021-25745",
+   "title": "Ingress-nginx `path` can be pointed to service account token file",
+   "components": [
+    "kubectl"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.2": "1.2.0"
+   },
+   "affected": [
+    "<v1.2.0"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/126812"
+  },
+  {
+   "cve": "CVE-2021-25741",
+   "title": "Symlink Exchange Can Allow Host Filesystem Access",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.22": "1.22.2",
+    "1.21": "1.21.5",
+    "1.20": "1.20.11",
+    "1.19": "1.19.15"
+   },
+   "affected": [
+    "v1.22.0 - v1.22.1",
+    "v1.21.0 - v1.21.4",
+    "v1.20.0 - v1.20.10",
+    "<= v1.19.14"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/104980"
+  },
+  {
+   "cve": "CVE-2021-25737",
+   "title": "Holes in EndpointSlice Validation Enable Host Network Hijack",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "low",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.21": "1.21.1",
+    "1.20": "1.20.7",
+    "1.19": "1.19.11",
+    "1.18": "1.18.19"
+   },
+   "affected": [
+    "v1.21.0",
+    "v1.20.0 - v1.20.6",
+    "v1.19.0 - v1.19.10",
+    "v1.16.0 - v1.18.18 (Note: EndpointSlices were not enabled by default in 1.16-1.18)"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/102106"
+  },
+  {
+   "cve": "CVE-2021-25735",
+   "title": "Validating Admission Webhook does not observe some previous fields",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.21": "1.21.0",
+    "1.20": "1.20.6",
+    "1.19": "1.19.10",
+    "1.18": "1.18.18"
+   },
+   "affected": [
+    "kube-apiserver v1.20.0 - v1.20.5",
+    "kube-apiserver v1.19.0 - v1.19.9",
+    "kube-apiserver <= v1.18.17"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/100096"
+  },
+  {
+   "cve": "CVE-2020-8566",
+   "title": "Ceph RBD adminSecrets exposed in logs when loglevel >= 4",
+   "components": [
+    "kube-controller-manager"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.19": "1.19.3",
+    "1.18": "1.18.10",
+    "1.17": "1.17.13"
+   },
+   "affected": [
+    "kubernetes v1.19.0 - v1.19.2",
+    "kubernetes v1.18.0 - v1.18.9",
+    "kubernetes v1.17.0 - v1.17.12"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/95624"
+  },
+  {
+   "cve": "CVE-2020-8563",
+   "title": "Secret leaks in kube-controller-manager when using vSphere provider",
+   "components": [
+    "kube-controller-manager"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.19": "1.19.3"
+   },
+   "affected": [
+    "kube-controller-manager v1.19.0 - v1.19.2"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/95621"
+  },
+  {
+   "cve": "CVE-2020-8559",
+   "title": "Privilege escalation from compromised node to cluster",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": 6.4,
+   "windows_only": false,
+   "fixed_in": {
+    "1.18": "1.18.6",
+    "1.17": "1.17.9",
+    "1.16": "1.16.13"
+   },
+   "affected": [
+    "kube-apiserver v1.18.0-1.18.5",
+    "kube-apiserver v1.17.0-1.17.8",
+    "kube-apiserver v1.16.0-1.16.12",
+    "all kube-apiserver versions prior to v1.16.0"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/92914"
+  },
+  {
+   "cve": "CVE-2020-8557",
+   "title": "Node disk DOS by writing to container /etc/hosts",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": 5.5,
+   "windows_only": false,
+   "fixed_in": {
+    "1.18": "1.18.6",
+    "1.17": "1.17.9",
+    "1.16": "1.16.13"
+   },
+   "affected": [
+    "kubelet v1.18.0-1.18.5",
+    "kubelet v1.17.0-1.17.8",
+    "kubelet < v1.16.13"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/93032"
+  },
+  {
+   "cve": "CVE-2020-8555",
+   "title": "Half-Blind SSRF in kube-controller-manager",
+   "components": [
+    "kube-controller-manager"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.18": "1.18.1",
+    "1.17": "1.17.5",
+    "1.16": "1.16.9",
+    "1.15": "1.15.12"
+   },
+   "affected": [
+    "kube-controller-manager v1.18.0",
+    "kube-controller-manager v1.17.0 - v1.17.4",
+    "kube-controller-manager v1.16.0 - v1.16.8",
+    "kube-controller-manager <= v1.15.11",
+    "The affected volume types are: GlusterFS, Quobyte, StorageOS, ScaleIO"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/91542"
+  },
+  {
+   "cve": "CVE-2020-8552",
+   "title": "apiserver DoS (oom)",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.17": "1.17.3",
+    "1.16": "1.16.7",
+    "1.15": "1.15.10"
+   },
+   "affected": [
+    "kube-apiserver v1.17.0 - v1.17.2",
+    "kube-apiserver v1.16.0 - v1.16.6",
+    "kube-apiserver < v1.15.10"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/89378"
+  },
+  {
+   "cve": "CVE-2020-8551",
+   "title": "Kubelet DoS via API",
+   "components": [
+    "kubelet"
+   ],
+   "severity": "medium",
+   "cvss3": null,
+   "windows_only": false,
+   "fixed_in": {
+    "1.17": "1.17.3",
+    "1.16": "1.16.7",
+    "1.15": "1.15.10"
+   },
+   "affected": [
+    "kubelet v1.17.0 - v1.17.2",
+    "kubelet v1.16.0 - v1.16.6",
+    "kubelet v1.15.0 - v1.15.9"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/89377"
+  },
+  {
+   "cve": "CVE-2019-11253",
+   "title": "Kubernetes API Server JSON/YAML parsing vulnerable to resource exhaustion attack",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "high",
+   "cvss3": 7.5,
+   "windows_only": false,
+   "fixed_in": {
+    "1.16": "1.16.2",
+    "1.15": "1.15.5",
+    "1.14": "1.14.8",
+    "1.13": "1.13.12"
+   },
+   "affected": [
+    "kube-apiserver v1.16.0 - v1.16.1",
+    "kube-apiserver v1.15.0 - v1.15.4",
+    "kube-apiserver v1.14.0 - v1.14.7",
+    "kube-apiserver <= v1.12.x (fix almadı)"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/83261"
+  },
+  {
+   "cve": "CVE-2018-1002105",
+   "title": "proxy request handling in kube-apiserver can leave vulnerable TCP connections",
+   "components": [
+    "kube-apiserver"
+   ],
+   "severity": "critical",
+   "cvss3": 9.8,
+   "windows_only": false,
+   "fixed_in": {
+    "1.13": "1.13.0",
+    "1.12": "1.12.3",
+    "1.11": "1.11.5",
+    "1.10": "1.10.11"
+   },
+   "affected": [
+    "kube-apiserver <= v1.12.2",
+    "kube-apiserver v1.11.0 - v1.11.4",
+    "kube-apiserver v1.10.0 - v1.10.10",
+    "kube-apiserver <= v1.9.x (fix almadı)"
+   ],
+   "url": "https://github.com/kubernetes/kubernetes/issues/73476"
+  }
+ ]
+}

@@ -1,0 +1,51 @@
+[package]
+name = "recon_service"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+# Web Framework
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Async Runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# HTTP Client (Tech detection için kritik)
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "cookies"] }
+
+# DNS Resolution
+trust-dns-resolver = "0.23"
+
+# HTML Parsing (Tech fingerprinting için)
+scraper = "0.19"
+select = "0.6"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# MongoDB Driver
+mongodb = { version = "2.8", features = ["tokio-runtime"] }
+
+# Utilities
+uuid = { version = "1.0", features = ["v4", "serde"] }
+md5 = "0.7"
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+once_cell = "1.19"
+parking_lot = "0.12"
+ipnetwork = "0.20"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+colored = "2.0"
+
+# Concurrency Control
+rand = "0.8"
+
+# Network packet manipulation (spoof modülü için)
+pnet = "0.34"
+ssh2 = "0.9"

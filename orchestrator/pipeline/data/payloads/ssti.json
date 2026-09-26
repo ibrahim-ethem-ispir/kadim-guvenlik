@@ -1,0 +1,60 @@
+{
+ "class": "ssti",
+ "entries": [
+  {
+   "payload": "{{{A}*{B}}}",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "{{{{A}*{B}}}}",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "${{{A}*{B}}}",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "${{A}*{B}}",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "#{{A}*{B}}",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "<%={A}*{B}%>",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "<%{A}*{B}%>",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "[[{A}*{B}]]",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "[={A}*{B}=]",
+   "dialect": "engine",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "{{ {A}*{B} }}",
+   "dialect": "python",
+   "source": "Server Side Template Injection/Python.md"
+  },
+  {
+   "payload": "#{ {A}*{B} }",
+   "dialect": "ruby",
+   "source": "Server Side Template Injection/Ruby.md"
+  }
+ ]
+}

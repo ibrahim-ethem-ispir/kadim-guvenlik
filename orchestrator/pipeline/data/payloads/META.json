@@ -1,0 +1,13 @@
+{
+ "source": "https://github.com/swisskyrepo/PayloadsAllTheThings",
+ "commit": "3ac27901c711bdf3f5b65a7b1d1820a1f65bd09a",
+ "license": "MIT",
+ "extracted": "2026-09-24",
+ "counts": {
+  "sqli": 82,
+  "sqli_error": 59,
+  "xss": 133,
+  "lfi": 37,
+  "ssti": 11
+ }
+}

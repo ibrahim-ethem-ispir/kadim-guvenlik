@@ -1,0 +1,356 @@
+{
+  "categories": [
+    {
+      "id": "basic",
+      "name": "Temel Tarama",
+      "description": "Temel port tarama ve keşif seçenekleri. NOT: Sadece bir TCP tarama tipi seçin (-sS veya -sT veya -sA vb.)",
+      "options": [
+        {
+          "flag": "-sS",
+          "name": "TCP SYN Tarama (ÖNERİLEN)",
+          "description": "Varsayılan ve en popüler tarama. Hızlı, gizli (stealth) ve güvenilir. TCP bağlantısını tamamlamaz. Root yetkisi gerektirir.",
+          "type": "checkbox",
+          "default": true,
+          "group": "scan_type"
+        },
+        {
+          "flag": "-sT",
+          "name": "TCP Connect Tarama",
+          "description": "Tam TCP bağlantısı kurar. Root yetkisi gerektirmez ama daha yavaş ve loglanabilir. -sS seçiliyse bu devre dışı kalır.",
+          "type": "checkbox",
+          "default": false,
+          "group": "scan_type"
+        },
+        {
+          "flag": "-sA",
+          "name": "TCP ACK Tarama",
+          "description": "Firewall kurallarını keşfetmek için. Portların açık/kapalı durumunu değil, filtrelenmiş/filtrelenmemiş durumunu gösterir.",
+          "type": "checkbox",
+          "default": false,
+          "group": "scan_type"
+        },
+        {
+          "flag": "-sF",
+          "name": "TCP FIN Tarama",
+          "description": "Stealth tarama. FIN flag'i gönderir. Bazı firewall'ları atlatabilir.",
+          "type": "checkbox",
+          "default": false,
+          "group": "scan_type"
+        },
+        {
+          "flag": "-sN",
+          "name": "TCP NULL Tarama",
+          "description": "Hiçbir flag göndermez. Gizli tarama. Unix tabanlı sistemlerde etkili.",
+          "type": "checkbox",
+          "default": false,
+          "group": "scan_type"
+        },
+        {
+          "flag": "-sX",
+          "name": "TCP Xmas Tarama",
+          "description": "FIN, PSH ve URG flag'lerini gönderir. Gizli tarama. Unix tabanlı sistemlerde etkili.",
+          "type": "checkbox",
+          "default": false,
+          "group": "scan_type"
+        },
+        {
+          "flag": "-sU",
+          "name": "UDP Tarama",
+          "description": "UDP portlarını tarar. DNS, SNMP, DHCP gibi servisleri keşfeder. Yavaş olabilir. TCP taraması ile birlikte kullanılabilir.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "-sV",
+          "name": "Servis Versiyonu Tespit",
+          "description": "Açık portlarda çalışan servislerin versiyonlarını tespit eder.",
+          "type": "checkbox",
+          "default": true
+        },
+        {
+          "flag": "-O",
+          "name": "İşletim Sistemi Tespiti",
+          "description": "Hedefin işletim sistemini tahmin eder. Root yetkisi gerektirir.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "-A",
+          "name": "Agresif Tarama",
+          "description": "OS tespiti, versiyon tespiti, script tarama ve traceroute'u aktifleştirir.",
+          "type": "checkbox",
+          "default": false
+        }
+      ]
+    },
+    {
+      "id": "ports",
+      "name": "Port Seçimi",
+      "description": "Taranacak portları belirleyin",
+      "options": [
+        {
+          "flag": "-p",
+          "name": "Port Aralığı",
+          "description": "Taranacak portları belirtin. Örnek: 22,80,443 veya 1-1000 veya - (tüm portlar)",
+          "type": "text",
+          "default": "",
+          "placeholder": "22,80,443 veya 1-65535"
+        },
+        {
+          "flag": "-F",
+          "name": "Hızlı Tarama (100 port)",
+          "description": "Sadece en yaygın 100 portu tarar. Hızlı sonuç için.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "--top-ports",
+          "name": "En Popüler N Port",
+          "description": "En yaygın N portu tarar. Örnek: 1000",
+          "type": "number",
+          "default": null,
+          "placeholder": "1000"
+        }
+      ]
+    },
+    {
+      "id": "timing",
+      "name": "Zamanlama ve Performans",
+      "description": "Tarama hızını ve agresifliğini ayarlayın",
+      "options": [
+        {
+          "flag": "-T0",
+          "name": "Paranoid (En Yavaş)",
+          "description": "IDS/IPS atlatmak için. Her paket 5 dakika arayla. Çok yavaş.",
+          "type": "radio",
+          "default": false,
+          "group": "timing"
+        },
+        {
+          "flag": "-T1",
+          "name": "Sneaky (Gizli)",
+          "description": "IDS atlatmak için. Her paket 15 saniye arayla. Çok yavaş.",
+          "type": "radio",
+          "default": false,
+          "group": "timing"
+        },
+        {
+          "flag": "-T2",
+          "name": "Polite (Nazik)",
+          "description": "Hedef sistemi yormaz. Bant genişliği ve kaynak kullanımını azaltır.",
+          "type": "radio",
+          "default": false,
+          "group": "timing"
+        },
+        {
+          "flag": "-T3",
+          "name": "Normal (Varsayılan)",
+          "description": "Dengeli hız. Çoğu durum için uygundur.",
+          "type": "radio",
+          "default": true,
+          "group": "timing"
+        },
+        {
+          "flag": "-T4",
+          "name": "Aggressive (Agresif)",
+          "description": "Hızlı ve güvenilir ağlar için. Önerilen seçenek.",
+          "type": "radio",
+          "default": false,
+          "group": "timing"
+        },
+        {
+          "flag": "-T5",
+          "name": "Insane (Çılgın)",
+          "description": "Çok hızlı ağlar için. Paket kaybı olabilir.",
+          "type": "radio",
+          "default": false,
+          "group": "timing"
+        }
+      ]
+    },
+    {
+      "id": "firewall",
+      "name": "Firewall/IDS Atlatma",
+      "description": "Güvenlik duvarlarını ve saldırı tespit sistemlerini atlatma teknikleri",
+      "options": [
+        {
+          "flag": "-f",
+          "name": "Paket Parçalama",
+          "description": "IP paketlerini küçük parçalara böler. Bazı firewall'ları atlatabilir.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "-D",
+          "name": "Decoy (Yem IP'ler)",
+          "description": "Sahte kaynak IP'ler kullanarak gerçek IP'yi gizler. Örnek: RND:10 (10 rastgele IP)",
+          "type": "text",
+          "default": "",
+          "placeholder": "RND:10 veya 192.168.1.1,192.168.1.2,ME"
+        },
+        {
+          "flag": "-S",
+          "name": "Kaynak IP Spoofing",
+          "description": "Sahte kaynak IP kullanır. Yanıtlar size gelmez, sadece IDS karıştırmak için.",
+          "type": "text",
+          "default": "",
+          "placeholder": "192.168.1.100"
+        },
+        {
+          "flag": "--source-port",
+          "name": "Kaynak Port",
+          "description": "Belirli bir kaynak port kullanır. Bazı firewall'lar 53 (DNS) veya 20 (FTP) portuna izin verir.",
+          "type": "number",
+          "default": null,
+          "placeholder": "53"
+        },
+        {
+          "flag": "--data-length",
+          "name": "Rastgele Veri Ekle",
+          "description": "Paketlere rastgele veri ekler. İmza tabanlı IDS'leri atlatabilir.",
+          "type": "number",
+          "default": null,
+          "placeholder": "25"
+        },
+        {
+          "flag": "--randomize-hosts",
+          "name": "Host Sırasını Karıştır",
+          "description": "Hedef IP'leri rastgele sırada tarar. Desen tespitini zorlaştırır.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "--spoof-mac",
+          "name": "MAC Adresi Spoofing",
+          "description": "Sahte MAC adresi kullanır. 0 = rastgele, veya belirli MAC girin.",
+          "type": "text",
+          "default": "",
+          "placeholder": "0 veya AA:BB:CC:DD:EE:FF"
+        }
+      ]
+    },
+    {
+      "id": "scripts",
+      "name": "NSE Script Tarama",
+      "description": "Nmap Scripting Engine ile gelişmiş keşif ve güvenlik testleri",
+      "options": [
+        {
+          "flag": "--script=default",
+          "name": "Varsayılan Scriptler",
+          "description": "Güvenli ve bilgilendirici scriptleri çalıştırır.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "--script=vuln",
+          "name": "Zafiyet Tarama",
+          "description": "Bilinen güvenlik açıklarını tarar (CVE'ler).",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "--script=exploit",
+          "name": "Exploit Scriptleri",
+          "description": "Aktif exploit denemeleri yapar. DİKKATLİ KULLANIN!",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "--script=auth",
+          "name": "Kimlik Doğrulama Testi",
+          "description": "Zayıf kimlik doğrulama mekanizmalarını test eder.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "--script=brute",
+          "name": "Brute Force Saldırıları",
+          "description": "Şifre kırma denemeleri yapar. Uzun sürebilir.",
+          "type": "checkbox",
+          "default": false
+        }
+      ]
+    },
+    {
+      "id": "output",
+      "name": "Çıktı ve Loglama",
+      "description": "Tarama sonuçlarının formatı ve detay seviyesi",
+      "options": [
+        {
+          "flag": "-v",
+          "name": "Verbose (Detaylı Çıktı)",
+          "description": "Tarama ilerlemesini detaylı gösterir. Önerilir.",
+          "type": "checkbox",
+          "default": true
+        },
+        {
+          "flag": "-vv",
+          "name": "Çok Detaylı Çıktı",
+          "description": "Maksimum detay seviyesi. Her paketi gösterir.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "-d",
+          "name": "Debug Modu",
+          "description": "Hata ayıklama bilgilerini gösterir. Sorun giderme için.",
+          "type": "checkbox",
+          "default": false
+        },
+        {
+          "flag": "--reason",
+          "name": "Port Durumu Sebebi",
+          "description": "Portun neden açık/kapalı olduğunu gösterir.",
+          "type": "checkbox",
+          "default": true
+        },
+        {
+          "flag": "--open",
+          "name": "Sadece Açık Portlar",
+          "description": "Sadece açık portları gösterir. Kapalı/filtrelenmiş portları gizler.",
+          "type": "checkbox",
+          "default": false
+        }
+      ]
+    },
+    {
+      "id": "advanced",
+      "name": "Gelişmiş Seçenekler",
+      "description": "İleri seviye kullanıcılar için",
+      "options": [
+        {
+          "flag": "--max-retries",
+          "name": "Maksimum Yeniden Deneme",
+          "description": "Port taraması için maksimum yeniden deneme sayısı.",
+          "type": "number",
+          "default": null,
+          "placeholder": "3"
+        },
+        {
+          "flag": "--host-timeout",
+          "name": "Host Timeout (saniye)",
+          "description": "Bir host için maksimum bekleme süresi.",
+          "type": "text",
+          "default": "",
+          "placeholder": "30m veya 1800s"
+        },
+        {
+          "flag": "--min-rate",
+          "name": "Minimum Paket Hızı",
+          "description": "Saniyede gönderilecek minimum paket sayısı.",
+          "type": "number",
+          "default": null,
+          "placeholder": "100"
+        },
+        {
+          "flag": "--max-rate",
+          "name": "Maksimum Paket Hızı",
+          "description": "Saniyede gönderilecek maksimum paket sayısı.",
+          "type": "number",
+          "default": null,
+          "placeholder": "1000"
+        }
+      ]
+    }
+  ]
+}

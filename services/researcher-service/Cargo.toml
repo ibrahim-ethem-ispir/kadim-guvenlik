@@ -1,0 +1,58 @@
+[package]
+name = "researcher-service"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kadim Güvenlik Team"]
+description = "Zero-Day Research & Security Analysis Engine - Modern web framework vulnerability detection"
+
+[dependencies]
+# Web Framework - High performance async HTTP server
+axum = { version = "0.7", features = ["macros", "ws"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# HTTP Client - External service calls & web analysis
+reqwest = { version = "0.11", features = ["json", "rustls-tls", "cookies"] }
+
+# Database - MongoDB for scan persistence
+mongodb = { version = "2", features = ["bson-chrono-0_4"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTML/DOM Parsing
+scraper = "0.18"
+
+# Pattern Matching & Regex
+regex = "1"
+lazy_static = "1.4"
+
+# Headless Browser (Chrome DevTools Protocol)
+chromiumoxide = { version = "0.5", features = ["tokio-runtime"], default-features = false }
+futures = "0.3"
+
+# Async utilities
+async-trait = "0.1"
+tokio-stream = "0.1"
+
+# Logging & Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utils
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "1"
+anyhow = "1"
+url = "2"
+base64 = "0.21"
+sha2 = "0.10"
+hex = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

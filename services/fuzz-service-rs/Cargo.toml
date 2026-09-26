@@ -1,0 +1,40 @@
+[package]
+name = "fuzz-service-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web Framework
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full", "process"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+mongodb = "3"
+bson = { version = "2", features = ["chrono-0_4"] }
+
+# Async
+futures = "0.3"
+tokio-stream = "0.1"
+async-stream = "0.3"
+
+# Error Handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utils
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+regex = "1"
+
+# SSE
+axum-extra = { version = "0.9", features = ["typed-header"] }

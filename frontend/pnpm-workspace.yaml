@@ -1,0 +1,7 @@
+# Türkçe: pnpm 11 yapılandırması.
+# pnpm 10+ bağımlılık build script'lerini (postinstall vb.) güvenlik gereği
+# varsayılan olarak ENGELLER ve ERR_PNPM_IGNORED_BUILDS ile install'ı durdurur.
+# Bu proje tüm build script'lerine izin verir (core-js, esbuild vb. kurulumu için).
+# NOT: pnpm 11'de eski "pnpm.onlyBuiltDependencies" (package.json) kaldırıldı;
+# ayar artık YALNIZCA bu dosyada geçerlidir.
+dangerouslyAllowAllBuilds: true

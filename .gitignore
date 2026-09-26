@@ -1,0 +1,13 @@
+files
+.env
+__pycache__
+docs
+old-docs/
+.DS_Store
+
+services/__pycache__
+services/*/__pycache__
+services/*/target
+# AI red-team sürekli ölçüm — çalışma-zamanı çıktıları (CI yeniden üretir; baseline commit'lenir)
+scripts/ai_redteam_history.json
+scripts/ai_redteam_scoreboard.html

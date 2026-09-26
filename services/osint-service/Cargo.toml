@@ -1,0 +1,58 @@
+[package]
+name = "osint-service"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kadim Güvenlik Team"]
+description = "Maltego benzeri OSINT Intelligence servisi - Domain, IP, Email analizi ve graph görselleştirme"
+
+[dependencies]
+# Web Framework - Yüksek performanslı async HTTP server
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Database - MongoDB ve Redis bağlantıları
+mongodb = "2"
+
+
+# Serialization - JSON işlemleri
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# OSINT İşlemleri - DNS, WHOIS, SSL analizi
+trust-dns-resolver = "0.23"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+scraper = "0.18"
+x509-parser = "0.15"
+whois-rust = "1.5"
+
+# Async & Concurrency - Paralel OSINT sorguları
+futures = "0.3"
+async-trait = "0.1"
+
+# Logging & Tracing - Yapılandırılmış loglama
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utils - Yardımcı kütüphaneler
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "1"
+anyhow = "1"
+validator = { version = "0.16", features = ["derive"] }
+regex = "1"
+url = "2"
+base64 = "0.21"
+sha2 = "0.10"
+hex = "0.4"
+jsonwebtoken = "9"
+
+# IP/Network utils
+ipnetwork = "0.20"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

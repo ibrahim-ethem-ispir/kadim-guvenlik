@@ -1,0 +1,84 @@
+# Kadim Platform - Servis Başlatma Rehberi
+# =========================================
+# Servisler Docker Compose "profiles" ile ihtiyaca göre açılır.
+# Çekirdek servisler PROFİLSİZDİR: her zaman açılır. Tarama servisleri
+# ise sadece profili verildiğinde başlar. Bir tarama servisi kapalıyken
+# orchestrator ÇÖKMEZ; sadece o özellik geçici olarak kullanılamaz olur.
+
+# 📌 PROFİLLER
+# -----------
+# (profilsiz/çekirdek) : gateway, frontend, orchestrator, mongodb, auth-service
+# ai                   : ai-service (yapay zeka analiz)
+# port-scan            : nmap-service, rustscan-service
+# vuln-scan            : nuclei-service
+# recon                : subfinder-service, recon-service, osint-service
+# tools                : hash-cracker, fuzz-service, stress-service
+# research             : researcher-service
+
+# =========================================
+# 🚀 TEMEL BAŞLATMA
+# =========================================
+
+# Sadece çekirdek (gateway, frontend, orchestrator, mongodb, auth):
+# Profil vermeye gerek yok — profilsiz servisler otomatik açılır.
+docker compose up -d
+
+# Çekirdek + AI:
+docker compose --profile ai up -d
+
+# Çekirdek + port tarama + zafiyet tarama:
+docker compose --profile port-scan --profile vuln-scan up -d
+
+# =========================================
+# 🔧 ÇALIŞIRKEN SERVİS EKLEME
+# =========================================
+# Not: Bir servis profilliyse, adıyla tek tek açmak için de profili gerekir.
+
+# Bir profili sonradan ekle (çekirdek zaten ayaktayken):
+docker compose --profile recon up -d
+
+# Tek bir servisi profiliyle birlikte aç:
+docker compose --profile port-scan up -d nmap-service
+
+# =========================================
+# 📊 DURUM KONTROLÜ
+# =========================================
+
+# Hangi servisler çalışıyor:
+docker compose ps
+
+# Belirli bir profilin HANGİ servisleri açacağını (başlatmadan) gör:
+docker compose --profile recon config --services
+
+# Loglar:
+docker compose logs -f orchestrator
+docker compose logs -f nmap-service
+
+# =========================================
+# 🛑 DURDURMA
+# =========================================
+
+# Tek servis durdur (özellik "yok" olur, orchestrator ayakta kalır):
+docker compose stop nmap-service
+
+# Bir profilin servislerini durdur:
+docker compose --profile tools down
+
+# Her şeyi durdur (çekirdek dahil):
+docker compose down
+
+# =========================================
+# 🌐 HEPSİNİ AÇMAK (eski "hepsi birden" davranışı)
+# =========================================
+docker compose --profile ai --profile port-scan --profile vuln-scan \
+  --profile recon --profile tools --profile research up -d
+
+# =========================================
+# 💡 İPUÇLARI
+# =========================================
+# 1. İlk açılışta sadece "docker compose up -d" yeter (çekirdek).
+# 2. Tarama yapmadan önce ilgili profili aç (ör. nmap için --profile port-scan).
+# 3. Kullanmadığın servisi "stop" ile kapat — orchestrator çökmez, RAM boşalır.
+# 4. Var olmayan bir profil adı verirsen (ör. --profile scan) sessizce yalnızca
+#    çekirdek açılır; profil adlarını yukarıdaki listeden doğrula.
+# 5. wifi-service compose'da TANIMLI DEĞİL (sadece Dockerfile'ı var).

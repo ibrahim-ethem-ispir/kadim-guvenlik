@@ -1,0 +1,110 @@
+{
+  "categories": [
+    {
+      "id": "cve",
+      "name": "CVE Zafiyetleri",
+      "description": "Bilinen CVE zafiyetlerini tara (Log4Shell, Spring4Shell, vb.)",
+      "icon": "shield-alert",
+      "template_count": 2000,
+      "tags": ["cve"],
+      "severity": ["critical", "high"]
+    },
+    {
+      "id": "misconfig",
+      "name": "Yanlış Yapılandırmalar",
+      "description": "Güvenlik yapılandırma hatalarını tespit et",
+      "icon": "settings",
+      "template_count": 500,
+      "tags": ["misconfig"],
+      "severity": ["high", "medium"]
+    },
+    {
+      "id": "exposed-panels",
+      "name": "Açık Paneller",
+      "description": "Admin panelleri, login sayfaları ve dashboard'lar",
+      "icon": "lock-open",
+      "template_count": 300,
+      "tags": ["panel", "exposure"],
+      "severity": ["medium", "low"]
+    },
+    {
+      "id": "technologies",
+      "name": "Teknoloji Tespiti",
+      "description": "Kullanılan framework, CMS ve teknolojileri belirle",
+      "icon": "cpu",
+      "template_count": 400,
+      "tags": ["tech"],
+      "severity": ["info"]
+    },
+    {
+      "id": "owasp",
+      "name": "OWASP Top 10",
+      "description": "OWASP Top 10 zafiyetlerini tara",
+      "icon": "alert-triangle",
+      "template_count": 350,
+      "tags": ["owasp"],
+      "severity": ["critical", "high", "medium"]
+    },
+    {
+      "id": "wordpress",
+      "name": "WordPress",
+      "description": "WordPress plugin ve tema zafiyetleri",
+      "icon": "wordpress",
+      "template_count": 250,
+      "tags": ["wordpress"],
+      "severity": ["high", "medium"]
+    },
+    {
+      "id": "iot",
+      "name": "IoT Cihazlar",
+      "description": "Router, kamera ve IoT cihaz zafiyetleri",
+      "icon": "wifi",
+      "template_count": 200,
+      "tags": ["iot"],
+      "severity": ["critical", "high"]
+    },
+    {
+      "id": "network",
+      "name": "Network Servisleri",
+      "description": "SSH, FTP, SMB gibi network servis zafiyetleri",
+      "icon": "network",
+      "template_count": 180,
+      "tags": ["network"],
+      "severity": ["high", "medium"]
+    }
+  ],
+  "severities": [
+    {
+      "id": "critical",
+      "name": "Kritik",
+      "color": "#dc2626",
+      "description": "Acil müdahale gerektirir"
+    },
+    {
+      "id": "high",
+      "name": "Yüksek",
+      "color": "#ea580c",
+      "description": "Öncelikli düzeltilmeli"
+    },
+    {
+      "id": "medium",
+      "name": "Orta",
+      "color": "#f59e0b",
+      "description": "Planlı düzeltme"
+    },
+    {
+      "id": "low",
+      "name": "Düşük",
+      "color": "#84cc16",
+      "description": "İzleme gerektirir"
+    },
+    {
+      "id": "info",
+      "name": "Bilgi",
+      "color": "#3b82f6",
+      "description": "Bilgilendirme amaçlı"
+    }
+  ],
+  "total_templates": 5000,
+  "last_updated": "2024-01-15"
+}

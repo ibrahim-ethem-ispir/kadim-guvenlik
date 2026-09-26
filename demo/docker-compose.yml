@@ -1,0 +1,28 @@
+# Kadim Güvenlik — demo hedefi (kasıtlı zafiyetli)
+# ÖN KOŞUL: ana stack ayakta olmalı (ağ dış/external olarak tanımlı):
+#   docker compose up -d          # repo kökünde — kadim_platform_kadim-net ağını oluşturur
+# Kurulum:
+#   cd demo && docker compose up -d
+# Tarama hedefi: vuln.demo.local (orchestrator konteynerinden docker DNS ile çözülür)
+#
+# NEDEN hostname de IP değil: scope_guard IP-literal private adresi (172.x docker iç ağı)
+# BLOCKLAR (ALLOW_PRIVATE_TARGETS=false varsayılan); hostname ise SSRF-guard'dan muaftır
+# ve validate_target'ın domain_pattern'ına uyar (noktalı + alpha TLD).
+services:
+  kadim-demo:
+    build: .
+    container_name: kadim-demo
+    networks:
+      kadim-net:
+        aliases:
+          - vuln.demo.local   # scan hedefi — noktalı hostname (format+scope uyumlu)
+    ports:
+      # Yalnız localhost'a yayın: elle doğrulama için (curl 127.0.0.1:5001).
+      # LAN/internete AÇMA — uygulama kasıtlı zafiyetli.
+      - "127.0.0.1:5001:80"
+    restart: unless-stopped
+
+networks:
+  kadim-net:
+    external: true
+    name: kadim_platform_kadim-net

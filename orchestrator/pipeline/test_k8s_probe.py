@@ -1,0 +1,380 @@
+"""Türkçe: Kubernetes probu (k8s_probe) testleri — classify çekirdeği SAF; probe_kubernetes
+sahte-sunucuyla deterministik (ağ YOK).
+
+Kök: klasik tarama K8s'te boş döner; K8s-farkında prob auth'suz API yanıtını KANIT sayar.
+Testler: apiserver/kubelet/etcd sınıflandırma, sürüm çıkarımı, uçtan uca ifşa tespiti +
+temiz cluster'da bulgu-yok.
+
+Çalıştır: python3 orchestrator/pipeline/test_k8s_probe.py
+"""
+import asyncio
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from pipeline.k8s_probe import (  # noqa: E402
+    classify_apiserver, classify_anon_secrets, classify_kubelet_pods, classify_etcd,
+    classify_distro, classify_rancher, classify_kube_healthz, classify_cadvisor,
+    classify_kubelet_denied, classify_tls_identity,
+    extract_k8s_version, probe_kubernetes, KUBE_PORTS,
+    classify_nodeport, classify_registry_catalog, classify_dashboard,
+    parse_k8s_semver, compare_k8s_versions, match_k8s_cves,
+    load_k8s_cve_snapshot, probe_k8s_surface, is_nodeport,
+)
+
+
+def test_classify_apiserver_version():
+    body = '{"major":"1","minor":"27","gitVersion":"v1.27.3","platform":"linux/amd64"}'
+    c = classify_apiserver(200, body)
+    assert c and c["kind"] == "apiserver_version" and c["version"] == "v1.27.3"
+
+
+def test_classify_apiserver_status_enforced():
+    body = '{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"Forbidden"}'
+    c = classify_apiserver(403, body)
+    assert c and c["kind"] == "apiserver_status" and c["authz"] == "enforced"
+
+
+def test_classify_anon_secrets():
+    body = '{"kind":"SecretList","items":[{"type":"Opaque"},{"type":"kubernetes.io/service-account-token"}]}'
+    c = classify_anon_secrets(200, body)
+    assert c and c["exposed"] is True
+    assert classify_anon_secrets(403, body) is None   # reddedildiyse ifşa yok
+
+
+def test_classify_kubelet_pods():
+    body = '{"kind":"PodList","items":[{"metadata":{"name":"web"}},{"metadata":{"name":"db"}}]}'
+    c = classify_kubelet_pods(200, body)
+    assert c and c["exposed"] is True
+    assert classify_kubelet_pods(401, body) is None
+
+
+def test_classify_etcd():
+    assert classify_etcd(200, '{"etcdserver":"3.5.9","etcdcluster":"3.5.0"}')["kind"] == "etcd_version"
+    keys = '{"action":"get","node":{"key":"/","dir":true}}'
+    assert classify_etcd(200, keys)["exposed"] is True
+
+
+def test_extract_version():
+    assert extract_k8s_version('x "gitVersion":"v1.28.1" y') == "v1.28.1"
+    assert extract_k8s_version("nope") is None
+
+
+def test_classify_distro():
+    assert classify_distro("v1.28.4+rke2r1") == "rke2"
+    assert classify_distro("v1.29.0+k3s1") == "k3s"
+    assert classify_distro("v1.28.3-gke.1000") == "gke"
+    assert classify_distro("v1.30.2-eks-1552ad0") == "eks"
+    assert classify_distro("v1.27.3") is None        # vanilla
+    assert classify_distro(None) is None
+
+
+def test_classify_rancher():
+    assert classify_rancher(200, "<html><title>Rancher</title>")["kind"] == "rancher_ui"
+    api = '{"baseType":"error","code":"Unauthorized","message":"cattle auth required"}'
+    assert classify_rancher(401, api)["kind"] == "rancher_api"
+    # FP koruması: rastgele 403 K8s Status nesnesi Rancher SANILMAMALI
+    assert classify_rancher(403, '{"kind":"Status","reason":"Forbidden"}') is None
+    assert classify_rancher(200, "<title>Grafana</title>") is None
+
+
+def test_classify_kube_healthz():
+    assert classify_kube_healthz("kube-proxy", 200, "ipvs")["mode"] == "ipvs"
+    assert classify_kube_healthz("kube-scheduler", 200, "ok")["kind"] == "healthz_open"
+    assert classify_kube_healthz("kube-controller", 200, "ok")["kind"] == "healthz_open"
+    assert classify_kube_healthz("kube-proxy", 401, "ipvs") is None
+    assert classify_kube_healthz("kube-proxy", 200, "garbage") is None
+
+
+def test_classify_cadvisor():
+    assert classify_cadvisor(200, '{"num_cores":8,"memory_bytes":1024}') is not None
+    assert classify_cadvisor(404, '{"num_cores":8}') is None
+    assert classify_cadvisor(200, "<html>hi</html>") is None
+
+
+def test_classify_kubelet_denied():
+    # kubelet'nin ayırt edici reddetme imzası: {"error":"Unauthorized"}
+    assert classify_kubelet_denied(401, '{"error":"Unauthorized"}')["kind"] == "kubelet_denied"
+    assert classify_kubelet_denied(401, "Unauthorized: Please login")["kind"] == "kubelet_denied"
+    assert classify_kubelet_denied(401, "<html>login</html>") is None     # generic web 401 → eşleşmez
+    assert classify_kubelet_denied(200, '{"error":"x","m":"unauthorized"}') is None  # 200 değil
+
+
+def test_classify_tls_identity():
+    ids = classify_tls_identity(["10.0.0.5", "kube-apiserver", "kubernetes", "rke2"])
+    assert ids and ids["distro"] == "rke2" and "kube-apiserver" in ids["components"]
+    assert classify_tls_identity(["CN=ingress-nginx"])["distro"] is None   # bileşen var, dağıtım yok
+    assert classify_tls_identity(["random", "strings"]) is None
+    assert classify_tls_identity([]) is None
+    assert classify_tls_identity(["rke2", "k3s"])["distro"] == "rke2"      # sıra önceliği
+
+
+# ---- I/O: uçtan uca (sahte K8s sunucusu) ----
+
+class _R:
+    def __init__(self, status, text):
+        self.status_code = status
+        self.text = text
+
+
+class ExposedK8s:
+    """kubelet /pods ve apiserver anon /secrets ifşa eden yanlış-yapılandırılmış cluster."""
+    async def get(self, url, timeout=None):
+        if url.endswith("/version") and ":6443" in url:
+            return _R(200, '{"major":"1","gitVersion":"v1.27.3"}')
+        if "/secrets" in url:
+            return _R(200, '{"kind":"SecretList","items":[{"type":"Opaque"}]}')
+        if url.endswith("/pods"):
+            return _R(200, '{"kind":"PodList","items":[{"metadata":{"name":"web"}}]}')
+        return _R(404, "not found")
+
+
+class HardenedK8s:
+    """Sertleştirilmiş: apiserver var ama her şey 403; kubelet auth-gerektirir."""
+    async def get(self, url, timeout=None):
+        if url.endswith("/version"):
+            return _R(200, '{"major":"1","gitVersion":"v1.29.0"}')
+        return _R(403, '{"kind":"Status","apiVersion":"v1","reason":"Forbidden"}')
+
+
+def test_probe_exposed_cluster():
+    findings = asyncio.run(probe_kubernetes("victim.io", [443, 6443, 10250], ExposedK8s()))
+    titles = " ".join(f["title"] for f in findings)
+    assert "Anonim Secret" in titles       # kritik anon secret
+    assert "kubelet" in titles.lower()      # kubelet /pods ifşası
+    crit = [f for f in findings if f["severity"] == "critical"]
+    assert crit and all(f["confidence_tier"] == "confirmed" for f in crit)
+
+
+def test_probe_hardened_no_critical():
+    findings = asyncio.run(probe_kubernetes("hard.example", [443, 6443, 10250], HardenedK8s()))
+    # apiserver açık (medium) olabilir ama KRİTİK ifşa YOK (secrets/pods reddedildi)
+    assert not any(f["severity"] == "critical" for f in findings)
+
+
+def test_probe_no_kube_ports():
+    # K8s portu yoksa hiç yoklama yapma
+    assert asyncio.run(probe_kubernetes("x.io", [80, 443], ExposedK8s())) == []
+
+
+class RancherRKE2:
+    """RKE2 dağıtımı: 9345 supervisor +RKE2 gitVersion damgalı, 8443 Rancher UI,
+    2380 etcd-peer sürüm sızdırıyor, 10256 kube-proxy ipvs modda."""
+    async def get(self, url, timeout=None):
+        if ":9345" in url and url.endswith("/version"):
+            return _R(200, '{"major":"1","gitVersion":"v1.28.4+rke2r1"}')
+        if ":9345" in url:
+            return _R(403, '{"kind":"Status","reason":"Forbidden"}')
+        if ":8443" in url and url.endswith("/v3"):
+            return _R(401, '{"baseType":"error","code":"Unauthorized","message":"cattle"}')
+        if ":8443" in url:
+            return _R(404, "not found")
+        if ":2380" in url and url.endswith("/version"):
+            return _R(200, '{"etcdserver":"3.5.9","etcdcluster":"3.5.0"}')
+        if ":10256" in url and url.endswith("/proxyMode"):
+            return _R(200, "ipvs")
+        return _R(404, "not found")
+
+
+def test_probe_rke2_rancher_cluster():
+    findings = asyncio.run(probe_kubernetes(
+        "rke2.corp.io", [9345, 8443, 2380, 10256], RancherRKE2()))
+    text = " ".join(f["title"] + " " + f["proof"] for f in findings)
+    assert "RKE2" in text                    # dağıtım damgası başlığa/kanıta işlendi
+    assert "Rancher" in text                 # Rancher Norman-API imzası yakalandı
+    assert "etcd" in text.lower()            # etcd-peer (2380) da yoklandı
+    assert "kube-proxy" in text              # rol damgalama (ipvs)
+    # Hepsi tahribatsız GET kanıtı; secrets ifşası YOK → kritik secret bulgusu olmamalı
+    assert not any("Anonim Secret" in f["title"] for f in findings)
+
+
+# ---- V2 (Madde 5 / T4): NodePort sınıflandırma + sürüm→CVE danışma matrisi ----
+
+def test_is_nodeport():
+    assert is_nodeport(30000) and is_nodeport(32767) and is_nodeport(31234)
+    assert not is_nodeport(29999) and not is_nodeport(32768)
+    assert not is_nodeport(6443) and not is_nodeport("x") and not is_nodeport(None)
+
+
+def test_classify_nodeport():
+    # registry: header her path'te taşınır
+    c = classify_nodeport(404, "not found", {"Docker-Distribution-Api-Version": "registry/2.0"})
+    assert c and c["kind"] == "registry"
+    # dashboard: <title> imzası
+    c = classify_nodeport(200, "<html><title>Kubernetes Dashboard</title></html>", {})
+    assert c and c["kind"] == "dashboard"
+    # apiserver: gitVersion (classify_apiserver'e devir)
+    c = classify_nodeport(200, '{"major":"1","gitVersion":"v1.28.4"}', {})
+    assert c and c["kind"] == "apiserver_version" and c["version"] == "v1.28.4"
+    # apiserver: auth duvarı arkasında Status imzası (NodePort'tan sızan ingress-arkası API)
+    c = classify_nodeport(403, '{"kind":"Status","apiVersion":"v1","reason":"Forbidden"}', {})
+    assert c and c["kind"] == "apiserver_status"
+    # FP koruması: düz "ok" (healthz) ve rastgele SPA K8s DAMGALANAMAZ
+    assert classify_nodeport(200, "ok", {}) is None
+    assert classify_nodeport(200, "<title>Grafana</title>", {}) is None
+
+
+def test_classify_registry_catalog():
+    body = '{"repositories":["internal/api","internal/worker","bank/core"]}'
+    c = classify_registry_catalog(200, body)
+    assert c and c["exposed"] and "internal/api" in c["repositories"]
+    assert classify_registry_catalog(401, '{"errors":[{"code":"UNAUTHORIZED"}]}') is None
+    assert classify_registry_catalog(200, '{"kind":"Status"}') is None
+
+
+def test_classify_dashboard():
+    c = classify_dashboard(200, "<html><title>Kubernetes Dashboard</title></html>", {})
+    assert c and c["kind"] == "dashboard_ui"
+    # yönlendirme → probable
+    c = classify_dashboard(302, "", {"Location": "/dashboard/"})
+    assert c and c["kind"] == "dashboard_redirect"
+    # FP: Grafana / rastgele SPA / login sayfası eşleşmez
+    assert classify_dashboard(200, "<title>Grafana</title>", {}) is None
+    assert classify_dashboard(200, "<title>Login</title>", {}) is None
+
+
+def test_parse_semver():
+    assert parse_k8s_semver("v1.28.4") == (1, 28, 4)
+    assert parse_k8s_semver("v1.28.4+rke2r1") == (1, 28, 4)      # dağıtım soneki yok sayılır
+    assert parse_k8s_semver("1.30.2-eks-1552ad0") == (1, 30, 2)
+    assert parse_k8s_semver("v1.29.0+k3s1") == (1, 29, 0)
+    assert parse_k8s_semver(None) is None and parse_k8s_semver("master") is None
+
+
+def test_compare_versions():
+    assert compare_k8s_versions("v1.28.4+rke2r1", "1.28.12") == -1   # Terrapin-tarzı kıyas
+    assert compare_k8s_versions("v1.29.0+k3s1", "v1.28.15") == 1
+    assert compare_k8s_versions("v1.28.4", "v1.28.4+gke.100") == 0   # sonek farkı önemsiz
+    assert compare_k8s_versions("junk", "v1.28.4") == 0
+
+
+def _cves(comp, ver):
+    return {c["cve"] for c in match_k8s_cves(comp, ver)}
+
+
+def test_match_k8s_cves_snapshot_loaded():
+    # Statik snapshot repoda MEVCUT olmalı (feed'den üretilmiş); boşsa V2 katmanı kördür.
+    assert load_k8s_cve_snapshot(), "data/k8s/k8s_cves.json yüklenemedi"
+
+
+def test_match_k8s_cves_vulnerable():
+    # Gerçek danışma verisiyle: kube-apiserver 1.28.4 → CVE-2024-3177 (fix 1.28.9)
+    hits = match_k8s_cves("kube-apiserver", "v1.28.4")
+    ids = {c["cve"] for c in hits}
+    assert "CVE-2024-3177" in ids
+    m = [c for c in hits if c["cve"] == "CVE-2024-3177"][0]
+    assert "1.28.9" in m["match_reason"]
+
+
+def test_match_k8s_cves_fixed_branch():
+    # 1.28.9 = düzeltme sürümü → 3177 ÇIKMAZ; 1.29+ → 2727 dalı da temiz
+    assert "CVE-2024-3177" not in _cves("kube-apiserver", "v1.28.9")
+    assert "CVE-2023-2727" not in _cves("kube-apiserver", "v1.29.3")
+
+
+def test_match_k8s_cves_pre_window():
+    # Fix penceresi ÖNCESİ dal: kubelet 1.27.9 → CVE-2024-10220 (affected: <= v1.28.11)
+    ids = _cves("kubelet", "v1.27.9")
+    assert "CVE-2024-10220" in ids
+    # Aynı minor'da patch kıyası: 1.29.5 açık, 1.29.7 düzeltilmiş
+    assert "CVE-2024-10220" in _cves("kubelet", "v1.29.5")
+    assert "CVE-2024-10220" not in _cves("kubelet", "v1.29.7")
+
+
+def test_match_k8s_cves_component_filter():
+    # Bileşen filtresi: kubelet CVE'si apiserver sürümüne bağlanmaz (ve tersi)
+    assert not (_cves("kubelet", "v1.28.4") & {"CVE-2024-3177"})
+    assert not (_cves("kube-apiserver", "v1.29.5") & {"CVE-2024-10220"})
+
+
+def test_match_k8s_cves_synthetic_semantics():
+    # Sentetik snapshot ile semantik pin'i (gerçek veri değişse bile davranış sabit):
+    snap = [{"cve": "CVE-9999-0001", "title": "t", "components": ["kube-apiserver"],
+             "severity": "high", "fixed_in": {"1.30": "1.30.3", "1.29": "1.29.7"}}]
+    assert _cves_snapshot("kube-apiserver", "v1.29.5", snap) == {"CVE-9999-0001"}
+    assert _cves_snapshot("kube-apiserver", "v1.29.7", snap) == set()
+    assert _cves_snapshot("kube-apiserver", "v1.30.3", snap) == set()
+    assert _cves_snapshot("kube-apiserver", "v1.31.0", snap) == set()   # düzeltilmiş dal
+    assert _cves_snapshot("kube-apiserver", "v1.28.9", snap) == {"CVE-9999-0001"}  # pencere öncesi
+    assert _cves_snapshot("kubelet", "v1.29.5", snap) == set()          # bileşen filtresi
+
+
+def _cves_snapshot(comp, ver, snap):
+    return {c["cve"] for c in match_k8s_cves(comp, ver, snapshot=snap)}
+
+
+class _R2(_R):
+    """_get_full için header'lı yanıt."""
+    def __init__(self, status, text, headers=None):
+        super().__init__(status, text)
+        self.headers = headers or {}
+
+
+class NodePortFarm:
+    """NodePort'larında dashboard + anon registry + apiserver sızan cluster.
+    30123=dashboard, 30250=registry(anon katalog), 30321=ingress-arkası apiserver,
+    30444=sıradan uygulama (bulgu ÜRETMEMELİ)."""
+    async def get(self, url, timeout=None):
+        if ":30123" in url and url.endswith("/version"):
+            return _R2(404, "not found", {})
+        if ":30123" in url:
+            return _R2(200, "<html><title>Kubernetes Dashboard</title></html>", {})
+        if ":30250" in url:
+            return _R2(404, "404",
+                       {"Docker-Distribution-Api-Version": "registry/2.0"})
+        if ":30250" in url.replace("https", "http"):
+            return _R2(404, "404",
+                       {"Docker-Distribution-Api-Version": "registry/2.0"})
+        if ":30321" in url and url.endswith("/version"):
+            return _R2(403, '{"kind":"Status","apiVersion":"v1","reason":"Forbidden"}', {})
+        if ":30444" in url and url.endswith("/version"):
+            return _R2(404, "nope", {})
+        if ":30444" in url:
+            return _R2(200, "<html><title>Blog</title></html>", {})
+        return _R2(404, "not found", {})
+
+    async def get_catalog(self, url):
+        # yardımcı değil — sadece imza
+        return _R2(200, '{"repositories":["internal/api","bank/core"]}', {})
+
+
+class NodePortFarmRegistry(NodePortFarm):
+    """Katalog anonim AÇIK: /v2/_catalog 200 + repositories."""
+    async def get(self, url, timeout=None):
+        if "/v2/_catalog" in url:
+            return _R2(200, '{"repositories":["internal/api","bank/core"]}', {})
+        return await super().get(url, timeout)
+
+
+def test_probe_k8s_surface():
+    findings, hits = asyncio.run(probe_k8s_surface(
+        "farm.io", [30123, 30321, 30444], NodePortFarm()))
+    titles = " ".join(f["title"] for f in findings)
+    assert "Dashboard" in titles                       # NodePort'tan yönetim konsolu
+    assert hits.get(30321) in ("https", "http")        # apiserver sızıntısı → derin prob beslemesi
+    assert not any("Registry" in t for t in [f["title"] for f in findings])  # katalog yok
+    # sıradan uygulama (30444) bulgu ÜRETMEZ — FP-güvenlik
+    assert not any("30444" in f["target"] for f in findings)
+
+
+def test_probe_k8s_surface_registry_exposed():
+    findings, _hits = asyncio.run(probe_k8s_surface(
+        "farm2.io", [30250, 30123], NodePortFarmRegistry()))
+    crit = [f for f in findings if f["severity"] == "critical"]
+    assert crit and "Registry" in crit[0]["title"] and "Katalog" in crit[0]["title"]
+    assert "internal/api" in crit[0]["proof"]          # kanıt repoları taşır
+    assert crit[0]["confidence_tier"] == "confirmed"   # anonim 200 = deterministik kanıt
+
+
+def test_probe_k8s_surface_no_nodeports():
+    findings, hits = asyncio.run(probe_k8s_surface("x.io", [80, 443, 6443], NodePortFarm()))
+    assert findings == [] and hits == {}
+
+
+if __name__ == "__main__":
+    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    for fn in fns:
+        fn()
+        print(f"✓ {fn.__name__}")
+    print(f"\n{len(fns)} test geçti.")
