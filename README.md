@@ -15,6 +15,8 @@
 
 Mikroservis mimarisinde geliştirilmiş, AI destekli, Docker tabanlı, ölçeklenebilir siber güvenlik platformu.
 
+> ⚠️ **Yasal uyarı:** Yalnızca **kendi sisteminizde veya yazılı izniniz olan hedeflerde** yetkili güvenlik testleri içindir. İzinsiz tarama yasadışıdır (TCK 243-244). Ayrıntılı sorumluluk reddi sayfa sonunda · [SECURITY.md](SECURITY.md)
+
 ## ✨ Özellikler
 
 ### 🔍 Keşif & Tarama
@@ -67,8 +69,8 @@ Mikroservis mimarisinde geliştirilmiş, AI destekli, Docker tabanlı, ölçekle
 ┌─────────────┐  ┌─────────────────────────────────┐  ┌─────────────────┐
 │ AI Service  │  │        Security Services        │  │  Data Storage   │
 │ • Brain     │  │ • Nmap        • Nuclei          │  │ • MongoDB 8.0   │
-│ • PHANTOM   │  │ • RustScan    • Subfinder       │  │ • Vector Search │
-│ • Zero-Day  │  │ • Recon       • OSINT           │  │                 │
+│ • PHANTOM   │  │ • RustScan    • Subfinder       │  │ • Qdrant vektör │
+│ • Zero-Day  │  │ • Recon       • OSINT           │  │ • Vector Search │
 │ • Orchestra │  │ • Hash Cracker • Stress Test    │  │                 │
 │             │  │ • Fuzzer       • Wi-Fi Audit    │  │                 │
 │             │  │ • Researcher                    │  │                 │
@@ -109,6 +111,25 @@ docker-compose up --build
 # Detached mode (arka planda)
 docker-compose up -d --build
 ```
+
+### Ortam Değişkenleri (`.env`)
+
+`.env.example` tüm değişkenleri açıklamalarıyla listeler. Özet:
+
+| Değişken | Zorunlu | Açıklama |
+|----------|---------|----------|
+| `MONGO_USER` / `MONGO_PASS` | ✅ | MongoDB kimliği — **varsayılan parola yoktur**; boşsa sistem bilerek açılmaz (`openssl rand -base64 32`) |
+| `JWT_SECRET` | ✅ | JWT imzalama anahtarı, min 32 karakter (`openssl rand -hex 32`) |
+| `REGISTER_ENABLED` / `AUTO_ACTIVATE_USERS` | – | Kayıt sistemi (varsayılan AÇIK; dışa açık kurulumda kapatın) |
+| `AUTONOMOUS_SEVERITY_FLOOR` | – | Otonom tarama şiddet tabanı: `medium` (varsayılan)/`low`/`critical` |
+| `AUTONOMOUS_MAX_STEPS` / `AUTONOMOUS_MAX_SECONDS` | – | Otonom motor bütçesi |
+| `AUTONOMOUS_LLM_PROVIDER` | – | `ollama`/`deepseek`/`claude`/`gemini` (DB > .env önceliği) |
+| `DEEPSEEK_API_KEY` / `CLAUDE_API_KEY` / `GEMINI_API_KEY` | – | LLM sağlayıcı anahtarları — yoksa motor kural-fallback ile çalışır |
+| `SHODAN_API_KEY` / `VIRUSTOTAL_API_KEY` / `ABUSEIPDB_API_KEY` | – | OSINT kaynakları |
+| `PDCP_API_KEY` | – | ProjectDiscovery vulnx CVE istihbaratı (keysiz de çalışır, limitli) |
+| `LOOP_GUARD_ENABLED` / `LOOP_GUARD_SAME_LIMIT` | – | Davranış denetimi / döngü koruması (varsayılan AÇIK) |
+| `VECTOR_MEMORY_ENABLED` / `QDRANT_URL` | – | Vektör hafıza (varsayılan KAPALI; Qdrant en iyi çabayla çalışır) |
+| `K8S_PROBE_V2` / `WP_PROBE` / `IDOR_PROBE` / `COMBO_CHAINS` | – | Yüzey probu bayrakları (varsayılan AÇIK) |
 
 ### Erişim
 
@@ -193,6 +214,14 @@ http://localhost:5566/nmap-advanced adresinden erişin:
 ### 6. API Kullanımı
 
 ```bash
+# Otonom tarama (v2) — ana senaryo: profil "autonomous"
+curl -X POST http://localhost:5566/api/v2/scan \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"target": "example.com", "profile": "autonomous", "level": "standard"}'
+# Oturum WebSocket'ten canlı izlenir; sonuç: GET /api/v2/scan/{scan_id}
+# (Swagger: /api/docs)
+
 # AI Brain - Zero-Day Hunt
 curl -X POST http://localhost:5566/api/brain/zero-day-hunt \
   -H "Content-Type: application/json" \
@@ -372,9 +401,14 @@ Katkılar memnuniyetle karşılanır — yeni araç servisi, prob modülü, hata
 
 Ayrıntılar: [CONTRIBUTING.md](CONTRIBUTING.md) · Hata/özellik bildirimi: [Issue şablonları](.github/ISSUE_TEMPLATE/) · Güvenlik açığı: [SECURITY.md](SECURITY.md)
 
+## 📦 Üçüncü taraf katkıları
+
+- **Payload corpus** (`orchestrator/pipeline/data/payloads/`): [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) (MIT) derlemesinden süzülmüştür — bkz. `LICENSE-PATT` ve `META.json` (kaynak commit bağlantılı).
+- Tüm atıflar: [NOTICE](NOTICE)
+
 ## 📄 Lisans
 
-MIT License
+MIT License — bkz. [LICENSE](LICENSE). Üçüncü taraf lisansları için [NOTICE](NOTICE).
 
 ## 👥 Ekip
 

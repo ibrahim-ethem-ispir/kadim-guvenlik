@@ -1,0 +1,23 @@
+Kadim Güvenlik — Üçüncü Taraf Bildirimleri / Third-Party Notices
+================================================================
+
+Bu yazılım aşağıdaki üçüncü taraf bileşenlerini içerir veya kullanır.
+This software includes or derives from the following third-party components.
+
+1. PayloadsAllTheThings (payload corpus)
+   Kaynak:  https://github.com/swisskyrepo/PayloadsAllTheThings
+   Lisans:  MIT — bkz. orchestrator/pipeline/data/payloads/LICENSE-PATT
+   Kullanım: orchestrator/pipeline/data/payloads/ altındaki JSON corpus, PATT
+   derlemesinden süzülerek üretilmiştir (kaynak commit bağlantısı: META.json).
+
+2. SheetJS Community Edition (xlsx)
+   Kaynak:  https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+   Lisans:  Apache-2.0
+   Kullanım: frontend dışa aktarma özellikleri.
+
+3. Go / Python / Rust bağımlılıkları
+   Ayrıntılı liste ve lisanslar: frontend/pnpm-lock.yaml, services/*/Cargo.lock,
+   */requirements.txt — lisans metinleri ilgili paketlerin kendi dağıtımlarındadır.
+
+4. Nuclei şablonları (projectdiscovery/nuclei-templates, MIT)
+   Çalışma zamanında indirilir (nuclei-templates volume); bu depoya gömülü DEĞİLDİR.

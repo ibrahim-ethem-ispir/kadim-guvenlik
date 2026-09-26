@@ -1,7 +1,6 @@
 files
 .env
 __pycache__
-docs
 old-docs/
 .DS_Store
 

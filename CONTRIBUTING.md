@@ -29,13 +29,15 @@ Yeni yerli prob: `orchestrator/pipeline/<x>_probe.py` (ağ/DB bağımsız saf ç
 
 ## Testler
 
-Python testleri düz script'tir (pytest yok):
+Python testleri düz script'tir (pytest yok). Tüm suite tek komutta (CI ile aynı):
 
 ```bash
-python3 orchestrator/pipeline/test_playbook.py
+bash scripts/run_tests.sh                # tüm test dosyaları
+bash scripts/run_tests.sh test_k8s       # isim filtresi (opsiyonel)
+python3 orchestrator/pipeline/test_playbook.py   # tek dosya
 ```
 
-Etkilediğiniz modülün testini çalıştırın; yoksa ekleyin.
+PR'dan önce `bash scripts/run_tests.sh` yeşil olmalı; etkilediğiniz modülün testini çalıştırın, yoksa ekleyin. Statik analiz: `ruff check .` (bkz. `ruff.toml`).
 
 ## Commit mesajları
 

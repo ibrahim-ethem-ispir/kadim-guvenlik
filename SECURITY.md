@@ -2,7 +2,10 @@
 
 ## Güvenlik açığı bildirimi
 
-Bu depoda veya bağlı servislerde bir güvenlik açığı bulursanız **GitHub issue açmayın**. Bunun yerine depo sahibine doğrudan (GitHub profilindeki iletişim yoluyla) ulaşın.
+Bu depoda veya bağlı servislerde bir güvenlik açığı bulursanız **GitHub issue açmayın**. Bildirim kanalları (öncelik sırasıyla):
+
+1. **GitHub Private Vulnerability Reporting** — depo sayfasındaki **Security → Report a vulnerability** (tercih edilen, gizli kanal).
+2. Depo sahibinin **GitHub profilindeki iletişim yoluyla** doğrudan ulaşın.
 
 - Raporunuz **en geç 72 saat içinde** yanıtlanır.
 - Onarım tamamlanana kadar açığı gizli tutarız; disclosure sürecini birlikte planlarız.
