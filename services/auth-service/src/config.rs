@@ -50,9 +50,9 @@ impl Config {
             .unwrap_or(true);
 
         // Türkçe: CORS için izin verilen originler
-        // Örnek: "http://localhost:3000,https://dev.example-corp.com"
+        // Örnek: "http://localhost:3000,https://app.example.com"
         let allowed_origins_str = env::var("ALLOWED_ORIGINS")
-            .unwrap_or_else(|_| "http://localhost:5173,https://dev.example-corp.com".to_string());
+            .unwrap_or_else(|_| "http://localhost:5173,http://localhost:5566".to_string());
 
         let allowed_origins: Vec<String> = allowed_origins_str
             .split(',')

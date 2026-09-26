@@ -66,7 +66,8 @@ Frontend → **Auto-Scan** → oturum: 4 sınıfta **confirmed** bulgu beklenir
 çarpımı; redirect sentinel). Ham kanıt Mongo'da:
 
 ```bash
-docker exec -it kadim-mongodb mongosh -u kadim -p kadim_secure_2024 \
+# MONGO_PASS = .env içindeki parolanız (set -a; . ./.env; set +a ile yüklenebilir)
+docker exec -it kadim-mongodb mongosh -u kadim -p "$MONGO_PASS" \
   --authenticationDatabase admin kadim_security \
   --eval 'db.v2_scan_sessions.find({},{"ai_analysis":1}).sort({created_at:-1}).limit(1)'
 ```

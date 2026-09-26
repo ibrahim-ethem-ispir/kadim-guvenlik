@@ -34,7 +34,7 @@ REGISTER_ENABLED=false
 AUTO_ACTIVATE_USERS=false
 
 # CORS (virgülle ayrılmış)
-ALLOWED_ORIGINS=http://localhost:5173,https://dev.example-corp.com
+ALLOWED_ORIGINS=http://localhost:5173,https://app.example.com
 
 # Logging
 RUST_LOG=info,auth_service=debug
@@ -224,7 +224,7 @@ ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
 
 Production:
 ```env
-ALLOWED_ORIGINS=https://dev.example-corp.com,https://app.domain.com
+ALLOWED_ORIGINS=https://app.example.com,https://app.domain.com
 ```
 
 ### User Registration

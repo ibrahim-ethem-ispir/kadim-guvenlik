@@ -37,7 +37,8 @@ docker compose restart ai-service     # tek servis yeniden başlat
 - **Tarama servisleri**: nmap, rustscan, nuclei, subfinder, recon, osint, hash-cracker,
   fuzz, stress, researcher — her biri kendi FastAPI'si; orchestrator HTTP ile tetikler,
   sonuçları poll eder.
-- **mongodb**: kalıcı depo (kimlik: `kadim` / `kadim_secure_2024`, DB: `kadim_security`).
+- **mongodb**: kalıcı depo (kimlik `MONGO_USER`/`MONGO_PASS` `.env`'den — varsayılan parola YOK;
+  port yalnız `127.0.0.1:27018`; DB: `kadim_security`).
 
 ## Pipeline (kritik dosyalar)
 

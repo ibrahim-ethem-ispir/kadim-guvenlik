@@ -39,8 +39,16 @@ pub async fn auth_middleware(
     };
 
     // 2. Refresh Secret from Env
-    // Ideally passed via State, but env var is simpler for middleware signature
-    let secret = env::var("JWT_SECRET").unwrap_or_else(|_| "super_secret_kadim_key_123!".to_string());
+    // JWT_SECRET ZORUNLU — bilinen varsayılan anahtarla doğrulama YAPILMAZ (fail-closed).
+    let secret = match env::var("JWT_SECRET") {
+        Ok(s) if s.len() >= 32 => s,
+        _ => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::error("JWT_SECRET yapılandırması eksik veya çok kısa (min 32)")),
+            ));
+        }
+    };
 
     // 3. Verify Token
     let mut validation = Validation::new(Algorithm::HS256);

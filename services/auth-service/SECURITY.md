@@ -42,7 +42,7 @@ let cors = CorsLayer::new()
 #### Yapılandırma
 `.env` dosyasında:
 ```env
-ALLOWED_ORIGINS=http://localhost:5173,https://dev.example-corp.com
+ALLOWED_ORIGINS=http://localhost:5173,https://app.example.com
 ```
 
 ### 3. Input Validation
@@ -109,7 +109,7 @@ PORT=8007
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DATABASE=kadim_security
 JWT_SECRET=<32+ karakter güçlü secret>
-ALLOWED_ORIGINS=http://localhost:5173,https://dev.example-corp.com
+ALLOWED_ORIGINS=http://localhost:5173,https://app.example.com
 
 # Opsiyonel
 REGISTER_ENABLED=false

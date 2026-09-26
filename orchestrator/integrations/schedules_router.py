@@ -44,7 +44,7 @@ logger = logging.getLogger("orchestrator.schedules")
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://kadim:kadim_secure_2024@mongodb:27017")
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://mongodb:27017")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "kadim_security")
 AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://ai-service:8009")
 

@@ -18,7 +18,7 @@ impl Config {
                 .parse()
                 .unwrap_or(8011),
             mongodb_uri: env::var("MONGODB_URI")
-                .unwrap_or_else(|_| "mongodb://kadim:kadim_secure_2024@mongodb:27017".to_string()),
+                .unwrap_or_else(|_| "mongodb://mongodb:27017".to_string()),
             mongodb_database: env::var("MONGODB_DATABASE")
                 .unwrap_or_else(|_| "kadim_security".to_string()),
             osint_database: env::var("OSINT_DATABASE")

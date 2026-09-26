@@ -30,7 +30,7 @@ logger = logging.getLogger("rustscan-service")
 app = FastAPI(title="RustScan Service", version="2.0.0")
 
 # MongoDB Config
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://kadim:kadim_secure_2024@mongodb:27017")
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://mongodb:27017")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "kadim_security")
 
 mongo_client = None

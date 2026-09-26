@@ -31,7 +31,7 @@ logger = logging.getLogger("subfinder-service")
 app = FastAPI(title="Subfinder Service", version="1.0.0")
 
 # ============== MongoDB Configuration ==============
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://kadim:kadim_secure_2024@mongodb:27017")
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://mongodb:27017")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "kadim_security")
 
 # Türkçe: MongoDB bağlantısını başlat

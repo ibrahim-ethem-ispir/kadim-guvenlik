@@ -19,7 +19,7 @@ async def update_scan_result_callback(scan_id: str, service: str, result: dict):
     Ancak main.py yapısı monolithic olduğu için burada db erişimini yeniden tanımlayacağız.
     """
     from pymongo import MongoClient
-    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://kadim:kadim_secure_2024@mongodb:27017")
+    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://mongodb:27017")
     MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "kadim_security")
     
     try:
@@ -42,7 +42,7 @@ async def update_scan_result_callback(scan_id: str, service: str, result: dict):
 
 async def log_activity_callback(type: str, scan_id: str, target: str, message: str, severity: str = "info"):
     from pymongo import MongoClient
-    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://kadim:kadim_secure_2024@mongodb:27017")
+    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://mongodb:27017")
     MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "kadim_security")
     
     try:

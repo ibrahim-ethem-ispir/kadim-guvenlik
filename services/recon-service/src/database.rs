@@ -18,7 +18,7 @@ impl Database {
     /// Environment variable'dan URI alır
     pub async fn new() -> Result<Self, mongodb::error::Error> {
         let uri = std::env::var("MONGODB_URI")
-            .unwrap_or_else(|_| "mongodb://kadim:kadim_secure_2024@mongodb:27017".to_string());
+            .unwrap_or_else(|_| "mongodb://mongodb:27017".to_string());
         
         let db_name = std::env::var("MONGODB_DATABASE")
             .unwrap_or_else(|_| "kadim_security".to_string());

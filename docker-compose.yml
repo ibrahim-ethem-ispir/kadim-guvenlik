@@ -61,7 +61,7 @@ services:
       qdrant:
         condition: service_started
     environment:
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
       # --- Vektör hafıza (Qdrant) — embedding dış API maliyeti olmasın diye varsayılan KAPALI.
       - VECTOR_MEMORY_ENABLED=${VECTOR_MEMORY_ENABLED:-0}
@@ -92,7 +92,7 @@ services:
       # (cloud.projectdiscovery.io) .env'e PDCP_API_KEY olarak konursa limit kalkar.
       - PDCP_API_KEY=${PDCP_API_KEY:-}
       - VULNX_INTEL=${VULNX_INTEL:-1}
-      - JWT_SECRET=${JWT_SECRET:-kadim_super_secret_jwt_key_2024_secure_token!}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET .env içinde zorunlu — openssl rand -hex 32}
       # --- LLM yapılandırması (.env TEK doğruluk kaynağı) — eskiden orchestrator'a HİÇ geçmiyordu.
       # Otonom motor (auto-scan) + /api/settings/ai/env-status bu değişkenleri okur.
       - AUTONOMOUS_LLM_PROVIDER=${AUTONOMOUS_LLM_PROVIDER:-ollama}
@@ -116,10 +116,10 @@ services:
     image: mongo:8.0.20
     container_name: kadim-mongodb
     ports:
-      - "27018:27017"
+      - "127.0.0.1:27018:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-kadim}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-kadim_secure_2024}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}
       MONGO_INITDB_DATABASE: kadim_osint
     volumes:
       - mongo-data:/data/db
@@ -162,12 +162,12 @@ services:
       - "8007:8007"
     environment:
       - RUST_LOG=info
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
-      - JWT_SECRET=${JWT_SECRET:-kadim_super_secret_jwt_key_2024_secure_token!}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET .env içinde zorunlu — openssl rand -hex 32}
       - REGISTER_ENABLED=${REGISTER_ENABLED:-true}
       - AUTO_ACTIVATE_USERS=${AUTO_ACTIVATE_USERS:-true}
-      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5566,https://dev.example-corp.com
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5566
       - PORT=8007
     depends_on:
       mongodb:
@@ -200,7 +200,7 @@ services:
       - AI_SERVICE_LLM_PROVIDER=${AI_SERVICE_LLM_PROVIDER:-ollama}
       - AI_SERVICE_LLM_MODEL=${AI_SERVICE_LLM_MODEL:-}
       - AUTONOMOUS_MODEL=${AUTONOMOUS_MODEL:-hf.co/empero-ai/Qwythos-9B-v2-GGUF:Q4_K_M}
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
       - ORCHESTRATOR_URL=http://orchestrator:8000
     depends_on:
@@ -245,7 +245,7 @@ services:
       mongodb:
         condition: service_healthy
     environment:
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
     cap_add:
       - NET_ADMIN
@@ -269,7 +269,7 @@ services:
       mongodb:
         condition: service_healthy
     environment:
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
     volumes:
       - nuclei-logs:/app/logs
@@ -292,7 +292,7 @@ services:
       mongodb:
         condition: service_healthy
     environment:
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
     restart: unless-stopped
 
@@ -308,7 +308,7 @@ services:
       mongodb:
         condition: service_healthy
     environment:
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
       - RUST_LOG=info
     volumes:
@@ -324,7 +324,7 @@ services:
     container_name: kadim-osint
     environment:
       RUST_LOG: info
-      MONGODB_URI: mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      MONGODB_URI: mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       ORCHESTRATOR_URL: http://orchestrator:8000
       PORT: 8005
       SHODAN_API_KEY: ${SHODAN_API_KEY:-}
@@ -366,7 +366,7 @@ services:
       - "8011:8011"
     environment:
       - RUST_LOG=info
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
       - OSINT_DATABASE=kadim_osint
       - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
@@ -419,7 +419,7 @@ services:
       - "8012:8012"
     environment:
       - RUST_LOG=info
-      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       - MONGODB_DATABASE=kadim_security
     networks:
       - kadim-net
@@ -441,7 +441,7 @@ services:
     environment:
       RUST_LOG: info
       PORT: 8008
-      MONGODB_URI: mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:-kadim_secure_2024}@mongodb:27017
+      MONGODB_URI: mongodb://${MONGO_USER:-kadim}:${MONGO_PASS:?MONGO_PASS .env içinde zorunlu — bkz. .env.example}@mongodb:27017
       MONGODB_DATABASE: kadim_security
       RECON_SERVICE_URL: http://recon-service:8004
       OSINT_SERVICE_URL: http://osint-service:8005

@@ -89,7 +89,7 @@ def _get_db():
     global _mongo_client
     if _mongo_client is None:
         from pymongo import MongoClient
-        uri = os.getenv("MONGODB_URI", "mongodb://kadim:kadim_secure_2024@mongodb:27017")
+        uri = os.getenv("MONGODB_URI", "mongodb://mongodb:27017")
         _mongo_client = MongoClient(uri, serverSelectionTimeoutMS=2000)
     dbname = os.getenv("MONGODB_DATABASE", "kadim_security")
     return _mongo_client[dbname]

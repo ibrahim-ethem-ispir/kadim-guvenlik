@@ -33,7 +33,7 @@ logger = logging.getLogger("nuclei-service")
 app = FastAPI(title="Nuclei Service", version="3.0.0")  # MongoDB migration
 
 # ============== MongoDB Configuration ==============
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://kadim:kadim_secure_2024@mongodb:27017")
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://mongodb:27017")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "kadim_security")
 
 # Türkçe: MongoDB bağlantısını başlat

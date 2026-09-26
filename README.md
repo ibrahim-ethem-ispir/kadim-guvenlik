@@ -93,11 +93,10 @@ cd kadim-guvenlik
 # .env dosyasını oluşturun
 cp .env.example .env
 
-# GÜVENLİK (zorunlu):
-# 1) MONGO_PASS değerini varsayılan (kadim_secure_2024) halde BIRAKMAYIN —
-#    bilinen varsayılan parola ile herkes DB'nize erişir. Güçlü bir parola yazın.
-# 2) JWT_SECRET tanımlı OLMALIDIR (yoksa auth çalışmaz). Rastgele üretin:
-#    openssl rand -hex 32
+# GÜVENLİK (zorunlu — boş bırakılırsa sistem bilerek AÇILMAZ):
+# 1) MONGO_PASS yazın: güçlü rastgele parola (openssl rand -base64 32).
+#    Depoda varsayılan parola YOKTUR; bilinen bir değerle DB açılmaz.
+# 2) JWT_SECRET yazın (openssl rand -hex 32) — yoksa auth reddedilir.
 
 # API anahtarlarını ayarlayın (opsiyonel ama önerilen)
 # GEMINI_API_KEY - Google AI Studio'dan alın

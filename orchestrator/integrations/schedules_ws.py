@@ -24,7 +24,7 @@ logger = logging.getLogger("orchestrator.schedules_ws")
 
 router = APIRouter()
 
-MONGODB_URI = __import__("os").getenv("MONGODB_URI", "mongodb://kadim:kadim_secure_2024@mongodb:27017")
+MONGODB_URI = __import__("os").getenv("MONGODB_URI", "mongodb://mongodb:27017")
 MONGODB_DATABASE = __import__("os").getenv("MONGODB_DATABASE", "kadim_security")
 
 _mongo: MongoClient = None  # type: ignore
