@@ -7,7 +7,7 @@ anthropic==1.8.0
 # Google Gemini SDK — NOT: google-generativeai DEPRECATED (EOL 2025-11); ileride resmî
 # halef 'google-genai' SDK'sına taşınmalı. Model: gemini-2.0-flash
 google-generativeai==0.8.6
-python-dotenv==1.0.0
+python-dotenv==1.2.3
 # AI Brain Modülleri
 # MongoDB 8.0+ Native Vector Search (ChromaDB yerine)
 pymongo==4.6.1
