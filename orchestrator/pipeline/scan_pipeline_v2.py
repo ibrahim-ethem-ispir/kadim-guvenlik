@@ -6792,12 +6792,15 @@ class ScanPipelineV2:
             return
         arts = getattr(self, "_chain_artifacts", {}).get(session.scan_id) or []
         jwt_arts = [a for a in arts if a.get("kind") == "jwt_secret"]
-        if not jwt_arts:
+        lfi_arts = [a for a in arts if a.get("kind") == "lfi_param"]
+        ssrf_arts = [a for a in arts if a.get("kind") == "ssrf_param"]
+        if not (jwt_arts or lfi_arts or ssrf_arts):
             return
         root = engine.graph.nodes.get(engine.graph.root_id)
         if root is None:
             return
-        from .exploit_chain import run_jwt_forge_chain
+        from .exploit_chain import (run_jwt_forge_chain, run_lfi_credential_chain,
+                                    run_ssrf_metadata_chain)
         from .autonomous_engine import Evidence
         from .attack_graph import _canon_url
 
@@ -6852,6 +6855,88 @@ class ScanPipelineV2:
                                  "target": f["url"], "severity": "critical",
                                  "confidence_tier": "confirmed", "tool": "exploit_chain",
                                  "chain": "jwt_weak_secret→forge→protected_access"})
+
+                # ---- ZİNCİR-2: LFI config/cred okuma → kimlik doğrulama ----
+                # Kanıtlı LFI parametresiyle yapılandırma dosyaları SALT-OKUNUR okunur;
+                # sızan kimlik (kanıtta maskeli) CRED_REPLAY_VERIFY=1 ise hedefin login
+                # ucunda yanlış-kimlik baseline'ıyla kıyaslanarak denenir (tavan 3 deneme).
+                do_replay = os.getenv("CRED_REPLAY_VERIFY", "1") == "1"
+                login_eps = [u for u in (root.meta.get("endpoints") or [])
+                             if isinstance(u, str) and u.startswith(("http://", "https://"))
+                             and any(h in u.lower() for h in
+                                     ("login", "signin", "auth", "wp-login", "giris"))][:3]
+                for art in lfi_arts:
+                    akey = f"lfi|{art.get('url')}|{art.get('param')}"
+                    if akey in done:
+                        continue
+                    done.add(akey)
+                    try:
+                        findings = await run_lfi_credential_chain(
+                            art["url"], art.get("param"), client,
+                            login_endpoints=login_eps, do_replay=do_replay)
+                    except Exception as e:
+                        logger.debug(f"LFI-cred zinciri hatası: {e}")
+                        continue
+                    for f in findings:
+                        is_replay = f.get("kind") == "cred_replay"
+                        sev = "critical" if is_replay else "high"
+                        ev = Evidence(
+                            title=(f"Sızan Kimlikle Kimlik Doğrulama (LFI→config→login) @ "
+                                   f"{f.get('login_ep') or f['url']}") if is_replay else
+                                  f"LFI ile Yapılandırmadan Kimlik Sızıntısı @ {f['url']}",
+                            severity=sev, cve=None,
+                            target=f.get("login_ep") or f["url"],
+                            proof=f["proof"], tool="exploit_chain", step=engine.step,
+                            cwe=["CWE-522", "CWE-798"] if is_replay else ["CWE-200", "CWE-538"],
+                            mitre="T1078" if is_replay else "T1552.001",
+                            verified=True, verification_method=f["method"],
+                            verification_detail=f["proof"][:200],
+                            verification_confidence=0.95 if is_replay else 0.9,
+                            confidence_tier="confirmed",
+                            proof_bundle=f.get("proof_bundle"),
+                            proof_fingerprint=f.get("fingerprint"),
+                        )
+                        if engine.graph.add_evidence(
+                                ev, f"chain_lfi|{f.get('fingerprint') or f['url']}"):
+                            await narrate(
+                                ScanEventType.CRITICAL_FINDING,
+                                f"⛓️ ZİNCİR: {f['chain']} — {f.get('login_ep') or f['url']}",
+                                {"title": ev.title, "target": ev.target, "severity": sev,
+                                 "confidence_tier": "confirmed", "tool": "exploit_chain",
+                                 "chain": f["chain"]})
+
+                # ---- ZİNCİR-3: SSRF → metadata 2. adım (IAM kimlik yolu — SALT-OKUNUR) ----
+                for art in ssrf_arts:
+                    akey = f"ssrf|{art.get('url')}|{art.get('param')}"
+                    if akey in done:
+                        continue
+                    done.add(akey)
+                    try:
+                        findings = await run_ssrf_metadata_chain(
+                            art["url"], art.get("param"), client)
+                    except Exception as e:
+                        logger.debug(f"Metadata zinciri hatası: {e}")
+                        continue
+                    for f in findings:
+                        ev = Evidence(
+                            title=f"SSRF → Cloud Metadata İkinci Adım @ {f['url']}",
+                            severity="high", cve=None, target=f["url"],
+                            proof=f["proof"], tool="exploit_chain", step=engine.step,
+                            cwe=["CWE-918"], mitre="T1552.001",
+                            verified=True, verification_method=f["method"],
+                            verification_detail=f["proof"][:200],
+                            verification_confidence=0.9, confidence_tier="confirmed",
+                            proof_bundle=f.get("proof_bundle"),
+                            proof_fingerprint=f.get("fingerprint"),
+                        )
+                        if engine.graph.add_evidence(
+                                ev, f"chain_ssrf|{f.get('fingerprint') or f['url']}"):
+                            await narrate(
+                                ScanEventType.CRITICAL_FINDING,
+                                f"⛓️ ZİNCİR: {f['chain']} — {f['url']}",
+                                {"title": ev.title, "target": f["url"], "severity": "high",
+                                 "confidence_tier": "confirmed", "tool": "exploit_chain",
+                                 "chain": f["chain"]})
         except Exception as e:
             logger.debug(f"Exploit zinciri atlandı: {e}")
 
@@ -7822,6 +7907,19 @@ class ScanPipelineV2:
                     # 200 hipotez 15 yerine 200 kez canlı hedefe gider (istek amplifikasyonu).
                     attempted += 1
                     verdict = await verify_hypothesis(hyp, client, oast_client=getattr(engine, "oast_client", None))
+                    # T3-B zincir ARTIFACT: kanıtlı LFI/SSRF hipotezi → (url, param) kaydı.
+                    # _execute_chains bunu tüketip config/cred okuma + metadata 2. adım zincirlerini koşar.
+                    try:
+                        if getattr(verdict, "verified", False) and hyp.vuln_class in ("lfi", "ssrf"):
+                            if not hasattr(self, "_chain_artifacts"):
+                                self._chain_artifacts = {}
+                            self._chain_artifacts.setdefault(session.scan_id, []).append({
+                                "kind": f"{hyp.vuln_class}_param",
+                                "url": getattr(hyp, "url", ""),
+                                "param": getattr(hyp, "param", None),
+                            })
+                    except Exception:
+                        pass
                     if (not verdict.verified and not getattr(verdict, "skipped", False)
                             and engine.waf_profile is not None and attempted < cap):
                         # GENERATE-AND-VERIFY (Best-of-N) — AI-dışı sınıflar: duvar belli.
