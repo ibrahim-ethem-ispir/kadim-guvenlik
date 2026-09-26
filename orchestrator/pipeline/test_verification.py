@@ -9,8 +9,11 @@ Bu testler zamanlama-karar çekirdeğini pinler (I/O değil — saf, jitter'a da
 Çalıştır: python3 orchestrator/pipeline/test_verification.py
 """
 
+import asyncio
 import os
 import sys
+
+import httpx
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -20,6 +23,8 @@ from pipeline.verification import (
     detect_lfi_signature, is_open_redirect_location, ssti_arithmetic_evaluated,
     evidence_meta_for, CLASS_EVIDENCE_META, _replace_param_urls,
     detect_sqli_error_signature, confirm_boolean_sqli,
+    extract_sqli_error_value, parse_union_extracted,
+    verify_error_based_sqli, verify_union_extraction,
 )
 from pipeline.attack_hypothesis import VERIFIABLE_CLASSES
 
@@ -330,6 +335,70 @@ def test_evidence_meta_unknown_class_fallback():
     assert evidence_meta_for("open_redirect")["severity"] == "medium"
 
 
+# ---- sızan değer çözümlemesi + UNION veri çekimi (kanıt derinliği) ----
+
+def test_sqli_error_value_version_shown_identity_masked():
+    v = extract_sqli_error_value(
+        "You have an error... Duplicate entry '5.7.44-log' for key 'group_key'")
+    assert v and v[1] == "5.7.44-log"          # sürüm → AÇIK (sır değil, kanıt gerekli)
+    v2 = extract_sqli_error_value("XPATH syntax error: '~root@db~' near '/'")
+    assert v2 and v2[1].startswith("roo") and "***" in v2[1]   # kimlik → MASKELİ
+    assert "root@db" not in v2[1]
+    assert extract_sqli_error_value("masum metin, hata yok") is None
+
+
+def test_parse_union_extracted():
+    b = "header Kad1mUabcS5.7.44|root@dbKad1mUabcE footer"
+    assert parse_union_extracted(b, "Kad1mUabcS", "Kad1mUabcE") == ["5.7.44", "root@db"]
+    assert parse_union_extracted("marker yok", "Kad1mUabcS", "Kad1mUabcE") is None
+    assert parse_union_extracted("", "a", "b") is None
+
+
+def test_verify_error_based_sqli_value_in_proof():
+    def handler(request):
+        from urllib.parse import unquote
+        if "EXTRACTVALUE" in unquote(str(request.url)):
+            return httpx.Response(500, text="XPATH syntax error: '~5.8.31~' near '/'")
+        return httpx.Response(200, text="normal ürün sayfası")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    v = asyncio.run(verify_error_based_sqli("https://h.test/x?id=1", client))
+    assert v.verified is True
+    assert "5.8.31" in v.detail and "sızan değer" in v.detail   # kanıt derinleşti
+    asyncio.run(client.aclose())
+
+
+def test_verify_union_extraction_reads_data():
+    def handler(request):
+        from urllib.parse import unquote_plus
+        u = unquote_plus(str(request.url))
+        if "UNION SELECT" not in u:
+            return httpx.Response(200, text="<html>ürün listesi</html>")
+        import re as _re
+        ms = _re.search(r"(Kad1mU[0-9a-f]+S)", u)
+        me = _re.search(r"(Kad1mU[0-9a-f]+E)", u)
+        if ms and me:
+            return httpx.Response(
+                200, text=f"<html>{ms.group(1)}5.7.44-log|root@localhost{me.group(1)}</html>")
+        return httpx.Response(200, text="<html>ürün listesi</html>")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    v = asyncio.run(verify_union_extraction("https://h.test/list?id=1", client))
+    assert v.verified is True and v.method == "union-data-extraction"
+    assert "5.7.44-log" in v.detail                    # sürüm açık kanıt
+    assert "root@localhost" not in v.detail            # kimlik maskeli
+    assert "roo***" in v.detail
+    assert v.confidence >= 0.9
+    asyncio.run(client.aclose())
+
+
+def test_verify_union_extraction_no_marker_not_confirmed():
+    def handler(request):
+        return httpx.Response(200, text="<html>normal sayfa</html>")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    v = asyncio.run(verify_union_extraction("https://h.test/list?id=1", client))
+    assert v.verified is False and v.method == "union-data-extraction"
+    asyncio.run(client.aclose())
+
+
 def main():
     tests = [
         test_clear_sqli_confirmed, test_slow_jittery_server_not_confirmed,
@@ -356,6 +425,11 @@ def main():
         test_lfi_boot_ini_signature_detected,
         test_class_evidence_meta_covers_all_verifiable,
         test_evidence_meta_unknown_class_fallback,
+        test_sqli_error_value_version_shown_identity_masked,
+        test_parse_union_extracted,
+        test_verify_error_based_sqli_value_in_proof,
+        test_verify_union_extraction_reads_data,
+        test_verify_union_extraction_no_marker_not_confirmed,
     ]
     for t in tests:
         t()
