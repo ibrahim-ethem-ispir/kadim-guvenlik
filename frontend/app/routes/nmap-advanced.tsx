@@ -149,19 +149,15 @@ export default function NmapAdvanced() {
     // Türkçe: WebSocket bağlantısı kur
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/api/scan/stream/${newScanId}`;
-    console.log("🔌 WebSocket URL:", wsUrl);
     const websocket = new WebSocket(wsUrl);
 
     websocket.onopen = () => {
-      console.log("✅ WebSocket AÇILDI");
       // Türkçe: Bağlantı açıldığında scan parametrelerini gönder
       websocket.send(JSON.stringify({ target, options }));
-      console.log("📤 Tarama parametreleri gönderildi:", { target, options });
       setScanProgress(prev => ({ ...prev, status: "Bağlantı kuruldu, tarama başlıyor..." }));
     };
 
     websocket.onmessage = (event) => {
-      console.log("📨 WebSocket mesaj geldi:", event.data);
       const data = JSON.parse(event.data);
 
       if (data.type === "output") {
@@ -238,8 +234,6 @@ export default function NmapAdvanced() {
     };
 
     websocket.onclose = (event) => {
-      console.log("🔒 WebSocket KAPANDI:", event.code, event.reason);
-
       if (scanning && event.code !== 1000) {
         // Tarama devam ederken beklenmedik kapanma
         setOutput((prev) => [...prev, "\n⚠️ Bağlantı kesildi"]);

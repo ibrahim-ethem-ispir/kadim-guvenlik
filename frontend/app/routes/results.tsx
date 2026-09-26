@@ -50,18 +50,15 @@ export default function Results() {
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/api/scan/monitor/${scanId}`;
-    console.log("🔌 Monitoring WebSocket URL:", wsUrl);
 
     const websocket = new WebSocket(wsUrl);
 
     websocket.onopen = () => {
-      console.log("✅ Monitoring WebSocket AÇILDI");
       setIsMonitoring(true);
       setLiveOutput([`📡 Canlı izleme başlatıldı (${new Date().toLocaleTimeString()})`]);
     };
 
     websocket.onmessage = (event) => {
-      console.log("📨 Monitoring mesaj:", event.data);
       const msg = JSON.parse(event.data);
 
       if (msg.type === "output") {
@@ -77,7 +74,6 @@ export default function Results() {
     };
 
     websocket.onclose = (event) => {
-      console.log("🔒 Monitoring WebSocket KAPANDI:", event.code);
       setIsMonitoring(false);
       setLiveOutput(prev => [...prev, `🔌 Bağlantı kapatıldı (${new Date().toLocaleTimeString()})`]);
     };

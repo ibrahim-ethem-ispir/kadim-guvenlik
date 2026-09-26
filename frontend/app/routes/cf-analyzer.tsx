@@ -129,7 +129,6 @@ export default function CloudflareAnalyzer() {
 
             if (data.success) {
                 // Tarama iptal edildi, polling devam edecek ve Cancelled durumunu alacak
-                console.log('Tarama iptal edildi');
             }
         } catch (err) {
             console.error('İptal hatası:', err);

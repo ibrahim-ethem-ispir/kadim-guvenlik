@@ -57,7 +57,6 @@ export function useScanStream(options: UseScanStreamOptions = {}): UseScanStream
 
     es.onopen = () => {
       setIsConnected(true);
-      console.log('[SSE] Connected to scan stream:', scanId);
     };
 
     es.onerror = (e) => {

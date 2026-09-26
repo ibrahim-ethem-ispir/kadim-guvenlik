@@ -1,0 +1,13 @@
+# Türkçe: Ruff — GEVŞEK taban ayarı. Amaç: mevcut 218 dosyalık kod tabanını DÜŞÜRMEZ,
+# yalnız çalışmayı BOZAN hataları (syntax/undefined name) yakalar; katkıcılar için tek
+# stil kapısı. Giderek sıkılaştırılacak (bkz. CONTRIBUTING).
+line-length = 120
+target-version = "py311"
+
+[lint]
+# E9  = syntax hataları | F63/F7/F82 = comparison/undefined-name sınıfı KRİTİK hatalar
+select = ["E9", "F63", "F7", "F82"]
+
+[lint.per-file-ignores]
+# Test doktrini: sys.path.insert önsüzü import'lardan ÖNCE gelir (E402 kasıtlı)
+"**/test_*.py" = ["E402"]

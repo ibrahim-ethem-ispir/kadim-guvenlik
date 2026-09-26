@@ -70,11 +70,9 @@ export default function AIAnalysisPanel({
             try {
                 const history = await api.get<ChatHistoryResponse>(`/api/ai/conversation/${scanId}`);
                 if (history.exists && history.messages.length > 0) {
-                    console.log(`✅ Chat history yüklendi: ${history.message_count} mesaj`);
                     setChatMessages(history.messages);
                 }
-            } catch (e) {
-                console.log('Chat history bulunamadı (normal durum)');
+            } catch {
             } finally {
                 setHistoryLoaded(true);
             }
@@ -86,7 +84,6 @@ export default function AIAnalysisPanel({
     // Persistence Check - mevcut analiz
     useEffect(() => {
         if (scanData && scanData.ai_analysis) {
-            console.log('Loading persisted AI analysis');
             setAnalysis(scanData.ai_analysis as AIAnalysisResponse);
         }
     }, [scanData]);
@@ -185,7 +182,6 @@ export default function AIAnalysisPanel({
             await api.delete(`/api/ai/conversation/${scanId}`);
             setChatMessages([]);
             setAnalysis(null);
-            console.log('✅ Chat history temizlendi');
         } catch (e) {
             console.error('Chat history temizlenemedi:', e);
         }
@@ -208,8 +204,6 @@ export default function AIAnalysisPanel({
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-
-            console.log('✅ Chat history export edildi');
         } catch (e) {
             console.error('Export hatası:', e);
         }

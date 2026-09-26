@@ -353,7 +353,6 @@ export function usePipelineStream(options: UsePipelineStreamOptions = {}): UsePi
       // bıraktığı hata mesajı temizlenmezse UI'da kalıcı "WebSocket baglanti hatasi"
       // asılı kalırdı (bağlantı sağlamken bile).
       setError(null);
-      console.log('[WS] Connected to pipeline stream:', scanId);
     };
 
     ws.onclose = (e) => {
@@ -362,7 +361,6 @@ export function usePipelineStream(options: UsePipelineStreamOptions = {}): UsePi
       // Auto-reconnect if not intentionally closed and not complete
       // isCompleteRef: closure'daki state bayat olabilir (bkz. yukarıdaki kalkan notu).
       if (scanIdRef.current && !isCompleteRef.current && e.code !== 1000) {
-        console.log('[WS] Connection lost, reconnecting in 3s...');
         reconnectTimerRef.current = setTimeout(() => {
           if (scanIdRef.current) {
             connect(scanIdRef.current);

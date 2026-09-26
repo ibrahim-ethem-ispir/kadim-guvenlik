@@ -3402,6 +3402,13 @@ class ScanPipelineV2:
         "osint": OSINT_SERVICE_URL,
     }
 
+    # Kısa ad → docker compose servis adı — operatöre "şunu başlat" komutunu doğru isimle söyler.
+    _COMPOSE_SERVICE_NAMES = {
+        "nmap": "nmap-service", "nuclei": "nuclei-service", "subfinder": "subfinder-service",
+        "rustscan": "rustscan-service", "fuzz": "fuzz-service", "recon": "recon-service",
+        "osint": "osint-service",
+    }
+
     async def _probe_required_services(self) -> Dict[str, bool]:
         """KRİTİK (K7): Otonom motorun bağımlı olduğu 7 tarayıcı servisinin
         HTTP olarak ulaşılabilir olup olmadığını kısa (3sn) yoklar.
@@ -3594,7 +3601,7 @@ class ScanPipelineV2:
                     f"⚠️ TARAYICI SERVİSLERİ EKSİK — {', '.join(down)} ulaşılamaz. "
                     f"Bu araçlar her adımda sessizce 'failed' dönecek; tarama BOŞ "
                     f"çıkabilir. Başlatın: `docker compose up -d "
-                    f"{' '.join(_COMPOSE_SERVICE_NAMES[n] for n in down)}`",
+                    f"{' '.join(self._COMPOSE_SERVICE_NAMES.get(n, f'{n}-service') for n in down)}`",
                     {"service_status": svc_status, "missing_services": down},
                     persist_data={"service_status": svc_status,
                                   "missing_services": down},

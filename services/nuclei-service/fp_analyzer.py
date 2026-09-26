@@ -8,6 +8,7 @@ Türkçe: Nuclei bulgularını analiz ederek false positive olasılığını hes
 - MongoDB'den geçmiş FP istatistikleri
 """
 
+import os
 import re
 import logging
 from typing import Dict, Optional, List, Any

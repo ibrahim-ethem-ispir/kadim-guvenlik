@@ -18,19 +18,15 @@ export default function LiveTerminal({ scanId, title = "Canlı Tarama Logları",
     // Yeni birleşik ham log endpoint'i: nmap + nuclei çıktısını tek akışta verir.
     const wsUrl = `${protocol}//${window.location.host}/api/scan/raw/${scanId}`;
 
-    console.log("🔌 LiveTerminal WebSocket bağlanıyor:", wsUrl);
-
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("✅ LiveTerminal WebSocket AÇILDI");
       setStatus('connected');
       setOutput(prev => [...prev, `📡 Canlı ham log izleme başlatıldı (${new Date().toLocaleTimeString()})`]);
     };
 
     ws.onmessage = (event) => {
-      console.log("📨 LiveTerminal mesaj aldı:", event.data);
       try {
         const data = JSON.parse(event.data);
         const source = data.source ? `[${data.source.toUpperCase()}] ` : '';
@@ -46,11 +42,7 @@ export default function LiveTerminal({ scanId, title = "Canlı Tarama Logları",
             setOutput(prev => [...prev, ...lines.map((l: string) => `${source}${l}`)]);
           }
 
-        } else if (data.type === 'heartbeat') {
-          console.log("💓 Heartbeat:", data.data);
-
         } else if (data.type === 'complete') {
-          console.log("✅ Tarama tamamlandı:", data);
           setOutput(prev => [...prev, `\n✅ Tarama tamamlandı (${new Date().toLocaleTimeString()})`,
                                       `   Kaynak: ${data.source || 'N/A'}`,
                                       `   Exit Code: ${data.exit_code || 'N/A'}`,
@@ -62,16 +54,13 @@ export default function LiveTerminal({ scanId, title = "Canlı Tarama Logları",
           console.error("❌ Hata mesajı:", data.message);
           setOutput(prev => [...prev, `\n❌ Hata: ${data.message}`]);
           setStatus('error');
-        } else {
-          console.warn("⚠️ Bilinmeyen mesaj tipi:", data.type, data);
         }
       } catch (err) {
         console.error("❌ JSON parse hatası:", err, event.data);
       }
     };
 
-    ws.onclose = (event) => {
-      console.log("🔒 LiveTerminal WebSocket KAPANDI:", event.code, event.reason);
+    ws.onclose = () => {
       setStatus('disconnected');
       setOutput(prev => [...prev, `\n🔌 Bağlantı kapatıldı (${new Date().toLocaleTimeString()})`]);
       if (onComplete) onComplete();
@@ -84,7 +73,6 @@ export default function LiveTerminal({ scanId, title = "Canlı Tarama Logları",
     };
 
     return () => {
-      console.log("🧹 LiveTerminal WebSocket temizleniyor");
       ws.close();
     };
   }, [scanId]);

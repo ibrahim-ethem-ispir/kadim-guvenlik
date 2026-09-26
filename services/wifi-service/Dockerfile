@@ -9,7 +9,10 @@ RUN cargo build --release
 # Runtime image
 # We use Kali Rolling to get the latest security tools easily, or Debian Bookworm
 # Kali is preferred for 'aircrack-ng' and 'hcxdumptool' availability out of the box or via easy install
-FROM kalilinux/kali-rolling
+# DIGEST PİN: kali-rolling sürüm etiketi taşımaz (rolling) — build
+# determinizmi için digest sabitlendi (2026-09-20 manifest listesi). Güncelleme: digest'i
+# yenileyin (dependabot docker takibi bunu PR olarak açar).
+FROM kalilinux/kali-rolling@sha256:30399bd65187e06525008dd13eecc2b3439d26a82b2c6b0ba32dee72bd843117
 
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive

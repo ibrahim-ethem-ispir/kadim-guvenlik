@@ -20,6 +20,10 @@ jobs:
         run: |
           pip install -r orchestrator/requirements.txt
           pip install -r services/ai-service/requirements.txt
+      - name: Ruff (kritik hata taraması — bkz. ruff.toml)
+        run: |
+          pip install ruff
+          ruff check .
       - name: Testler (düz script — pytest yok)
         run: bash scripts/run_tests.sh
 
