@@ -4,7 +4,7 @@ fastapi==0.115.0
 uvicorn==0.31.0
 httpx==0.28.1
 pydantic==2.9.2
-websockets==17.0.1
+websockets==17.1
 pymongo==4.6.1
 pyjwt==2.15.0
 qdrant-client==1.12.2
