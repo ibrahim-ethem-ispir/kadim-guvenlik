@@ -137,7 +137,7 @@ services:
   # Mongo'ya dokunmaz; düşerse motor best-effort sürer (VECTOR_MEMORY_ENABLED ile tamamen kapatılabilir).
   # Port yalnız localhost'a bağlanır — dışa AÇIK DEĞİL, sadece iç ağ (kadim-net) + yerel debug.
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.19.1
     container_name: kadim-qdrant
     ports:
       - "127.0.0.1:6333:6333"
