@@ -104,6 +104,20 @@ docker-compose up -d --build
 - **API Docs**: http://localhost:5566/api/docs
 - **Gelişmiş Nmap**: http://localhost:5566/nmap-advanced
 - **AI Brain**: http://localhost:5566/ai-brain
+
+### İlk Kullanım — Kayıt & Giriş
+
+Kayıt **varsayılan olarak AÇIK** gelir; ayrı bir ayar yapmanız gerekmez:
+
+1. http://localhost:5566/register adresinden hesap oluşturun (kullanıcı adı + şifre)
+2. Hesap otomatik aktif olur (`AUTO_ACTIVATE_USERS=true`) → hemen http://localhost:5566/login adresinden girin
+
+Kaydı kapatmak için `.env`'e yazın ve servisleri yeniden başlatın:
+
+```bash
+REGISTER_ENABLED=false
+AUTO_ACTIVATE_USERS=false   # yeni kullanıcılar admin onayı bekler (isteğe bağlı)
+```
 - **OSINT**: http://localhost:5566/osint
 
 ## 📖 Kullanım

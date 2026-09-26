@@ -33,18 +33,21 @@ impl Config {
         let jwt_secret = env::var("JWT_SECRET")
             .expect("JWT_SECRET must be set");
             
+        // Türkçe: VARSAYILAN AÇIK — projeyi indiren kayıt olup hemen giriş yapabilsin.
+        // Kapatmak için REGISTER_ENABLED=false yapın.
         let register_enabled = env::var("REGISTER_ENABLED")
-            .unwrap_or_else(|_| "false".to_string())
+            .unwrap_or_else(|_| "true".to_string())
             .parse()
-            .unwrap_or(false);
+            .unwrap_or(true);
 
         // Türkçe: Yeni kullanıcılar otomatik aktif olsun mu?
         // true = Kayıt anında aktif (hemen giriş yapabilir)
         // false = Pasif başlar (admin onayı gerekir)
+        // Türkçe: VARSAYILAN AÇIK — açık kaynak kurulumda admin onayı olmadan giriş yapılabilsin.
         let auto_activate_users = env::var("AUTO_ACTIVATE_USERS")
-            .unwrap_or_else(|_| "false".to_string())
+            .unwrap_or_else(|_| "true".to_string())
             .parse()
-            .unwrap_or(false);
+            .unwrap_or(true);
 
         // Türkçe: CORS için izin verilen originler
         // Örnek: "http://localhost:3000,https://dev.example-corp.com"
