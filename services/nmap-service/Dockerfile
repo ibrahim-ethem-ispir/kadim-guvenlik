@@ -2,7 +2,7 @@
 # (bookworm ~7.93/7.94). -sV servis-imza veritabanı (nmap-service-probes) taze olmazsa
 # modern servisler (kubernetes apiserver vb.) yanlış/eksik tanınır → pipeline'ın servis
 # kategorizasyonu ve CVE korelasyonu bundan beslenir, tazelik kritik.
-FROM python:3.10-slim AS nmap-builder
+FROM python:3.11-slim AS nmap-builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget bzip2 ca-certificates build-essential libssl-dev zlib1g-dev \
@@ -16,7 +16,7 @@ RUN wget -q https://nmap.org/dist/nmap-7.991.tar.bz2 \
     && make -j"$(nproc)" \
     && make install
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Türkçe: nmap runtime bağımlılığı (libstdc++ — nmap C++; libssl3 slim'de zaten var)
 RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 \
