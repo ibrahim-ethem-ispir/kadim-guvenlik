@@ -1,7 +1,7 @@
 # Sürümler kilitli — deterministik build (docker/CI her seferinde aynı bağımlılık kümesi).
 # Güncelleme akışı: dependabot PR'ı → bash scripts/run_tests.sh yeşil olmalı.
 fastapi==0.141.1
-uvicorn==0.53.0
+uvicorn==0.54.0
 httpx==0.28.1
 pydantic==2.13.5
 websockets==17.1
