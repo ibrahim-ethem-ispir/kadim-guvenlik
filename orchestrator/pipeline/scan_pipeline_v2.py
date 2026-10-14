@@ -3769,8 +3769,13 @@ class ScanPipelineV2:
                 # Orchestrator-yerli AKTİF saldırı (probe_api_bola): dış servis yok →
                 # heartbeat dispatch makinesini atla, kampanyayı doğrudan koş. Sonuç
                 # normal akışa (artifact + observe + post-observe) StageResult olarak girer.
+                # cred_replay (KİMLİK DÜZLEMİ) de orchestrator-yerlidir: sır yalnız CREDENTIAL
+                # node meta'sında durur, olay kanalından ASLA geçmez (stage.options'ta node id
+                # + uç listesi var, ham sır yok).
                 if stage.tool == "probe_api_bola":
                     result = await self._dispatch_bola_native(session, engine, narrate, stage)
+                elif stage.tool == "cred_replay":
+                    result = await self._dispatch_cred_replay_native(session, engine, narrate, stage)
                 else:
                     dispatch_task = asyncio.create_task(dispatcher.dispatch(stage))
                     act_started = datetime.utcnow()
@@ -4087,6 +4092,35 @@ class ScanPipelineV2:
                     await self._synthesize_combinations(session, engine, narrate)
                 except Exception as _cbe:
                     logger.info(f"Kombinasyon sentezi atlandı (best-effort, scan={session.scan_id}): {_cbe}")
+                # KİMLİK DÜZLEMİ: sızıntı bulgularından kimlik çıkar → CREDENTIAL node +
+                # cred_replay kenarı (bulgu→silah, T1078). Kanıt/metin bazlı SAF çıkarım;
+                # sır olay kanalına asla ham çıkmaz. CRED_PLANE=0 kapatır.
+                await act("🗝️ Kimlik düzlemi — sızıntıdan kimlik silahlandırma")
+                try:
+                    await self._harvest_credentials(session, engine, narrate)
+                except Exception as _cre:
+                    logger.info(f"Kimlik düzlemi atlandı (best-effort, scan={session.scan_id}): {_cre}")
+                # CROSS-HOST DESEN YAYILIMI: kanıtlanmış zafiyet sınıfı kardeş surularda
+                # hedefli tag supurmesiyle aranir (operatör refleksi). Yeni istek burada yok,
+                # tohumlanan kenarı motor koşturur. PROPAGATE_PATTERNS=0 kapatır.
+                await act("🕸️ Cross-host desen yayılımı — kardeş surda hedefli süpürme")
+                try:
+                    await self._propagate_verified_patterns(session, engine, narrate)
+                except Exception as _ppe:
+                    logger.info(f"Desen yayılımı atlandı (best-effort, scan={session.scan_id}): {_ppe}")
+                # OPERATÖR PATH-PROPOSER: CONFIRMED kanıt varsa LLM'e 'sıradaki tek hamle +
+                # hedeflenen yol' sorulur; çıktı doğrulanmış graf kenarıdır (araç/host/opsiyon
+                # beyaz-listesi). Karar yine deterministik motorun. PATH_PROPOSER=0 kapatır.
+                try:
+                    _pm = await engine.propose_attack_path()
+                    if _pm:
+                        await narrate(
+                            ScanEventType.AGENT_THINKING,
+                            f"🧭 Operatör path önerisi: {_pm} saldırı kenarı kuyruğa girdi "
+                            f"(host/araç/opsiyon doğrulamasından geçti).",
+                            {"path_proposal_edges": _pm, "step": engine.step})
+                except Exception as _pme:
+                    logger.info(f"Path-proposer atlandı (best-effort, scan={session.scan_id}): {_pme}")
 
                 # WAPPALYZER PARMAK İZİ (tek-atış): web yüzeyi bilinir bilinmez teknoloji
                 # kimliğini üret → root.meta['technologies']'e MERGE olur, SONRAKİ turların
@@ -6566,6 +6600,102 @@ class ScanPipelineV2:
                   "candidates_probed": summary.get("candidates", 0)},
         )
 
+    async def _dispatch_cred_replay_native(self, session: PipelineSession, engine, narrate,
+                                           stage) -> StageResult:
+        """KİMLİK DÜZLEMİ icracısı (orchestrator-yerli): CREDENTIAL node'daki sızan kimliği
+        hedefin BİLİNEN login uçlarında yanlış-kimlik baseline'ıyla dener.
+
+        Operatörün ilk-erişim otoyolu (T1078 Valid Accounts): tarayıcı sızıntıyı listeler,
+        operatör sızıntıyı KAPIDAN içeri sokar. Dayanıklılık disiplini:
+          * baseline ÖNCE koşular (yanlış parola) — imzasız/özdeş yanıt = iddia YOK;
+            sınıflandırıcı exploit_chain.classify_login_response (3 bağımsız imza).
+          * ≤3 uç × ≤2 POST; erişilemeyen uç atlanır; kilitlenme riskine karşı tek
+            kullanıcı-denemesi (parola listesi DEĞİL — spray/brute doktrin kapalı).
+          * ham sır yalnız node.meta'da; olay/kanıt/metriklerde MASKE (T1078 kanıtında
+            kullanıcı adı maskelenir — rapor Third-Party'e gider).
+        Kanıt → confirmed critical Evidence + FOOTHOLD node + kampanya kilidi."""
+        started = datetime.utcnow()
+        skip = (os.getenv("CRED_PLANE", "1") != "1"
+                or os.getenv("CRED_REPLAY_VERIFY", "1") != "1")
+        if skip:
+            return StageResult(stage_name=stage.name, tool="cred_replay", status="skipped",
+                               error="CRED_PLANE/CRED_REPLAY_VERIFY kapalı (kill-switch)",
+                               started_at=started.isoformat(),
+                               completed_at=datetime.utcnow().isoformat())
+        from .exploit_chain import _post_login, classify_login_response, _mask_cred
+        from .attack_graph import _canon_host
+        import hashlib as _hl
+        opts = stage.options or {}
+        node = engine.graph.nodes.get(str(opts.get("cred_node") or ""))
+        meta = (node.meta or {}) if node is not None else {}
+        user = str(meta.get("user") or "")
+        secret = str(meta.get("secret") or "")
+        eps = [u for u in (opts.get("login_eps") or []) if isinstance(u, str)][:3]
+        if not user or not secret or not eps:
+            return StageResult(stage_name=stage.name, tool="cred_replay", status="skipped",
+                               error="cred_replay: kimlik/login ucu eksik",
+                               started_at=started.isoformat(),
+                               completed_at=datetime.utcnow().isoformat())
+        await narrate(
+            ScanEventType.AGENT_ACTION,
+            "🗝️ Kimlik düzlemi — sızan kimlik bilinen login uçlarında baseline'lı deneniyor…",
+            {"step": engine.step, "tool": "cred_replay", "endpoints": len(eps)},
+        )
+        import random as _rnd
+        wrong = "".join(_rnd.choice("abcdefghjkmnpqrstuvwxyz23456789") for _ in range(18))
+        attempts, sig_ok, ok_ep, ok_sig = [], None, "", ""
+        try:
+            async with httpx.AsyncClient(verify=False, follow_redirects=False,
+                                         timeout=15.0) as client:
+                for ep in eps:
+                    bs, _bh, bbody = await _post_login(client, ep, user, wrong)
+                    if bs == 0:
+                        attempts.append({"login_ep": ep, "status": 0, "signal": None})
+                        continue
+                    st, hd, body = await _post_login(client, ep, user, secret)
+                    sig = classify_login_response(st, hd, body, bbody)
+                    attempts.append({"login_ep": ep, "status": st, "signal": sig})
+                    if sig:
+                        sig_ok, ok_ep, ok_sig = sig, ep, sig
+                        break
+        except Exception as e:
+            return StageResult(stage_name=stage.name, tool="cred_replay", status="failed",
+                               error=f"cred_replay hatası: {e}",
+                               started_at=started.isoformat(),
+                               completed_at=datetime.utcnow().isoformat())
+        dur = (datetime.utcnow() - started).total_seconds()
+        if sig_ok:
+            host = _canon_host(str(opts.get("scan_target") or ok_ep or engine.target))
+            ev = Evidence(
+                title=f"KİMLİK YENİDEN KULLANIMI — Oturum Ele Geçirme (Credential Plane) @ {ok_ep}",
+                severity="critical", cve=None, target=ok_ep,
+                proof=(f"Sızan kimlik ({_mask_cred(user)}) login ucunda DOĞRULANDI: {ok_sig} "
+                       f"— yanlış-kimlik baseline'ından bağımsız üç imzadan biri ateş aldı. "
+                       f"Sır config/sızıntı bulgusundan türedi (kimlik düzlemi)."),
+                tool="cred_replay", step=engine.step,
+                cwe=["CWE-287", "CWE-798"], mitre="T1078",
+                verified=True, verification_method=f"cred-replay/{ok_sig}",
+                verification_detail=f"{ok_sig} @ {ok_ep}", verification_confidence=0.95,
+                confidence_tier="confirmed",
+            )
+            uhash = _hl.sha1(user.encode("utf-8", "replace")).hexdigest()[:10]
+            if engine.graph.add_evidence(ev, f"cred_replay|{ok_ep}|{uhash}"):
+                engine.graph.register_foothold(
+                    host, f"cred_replay {ok_sig} @ {ok_ep}", via="credential_plane")
+                engine._lock_focus(host, f"cred_replay: oturum ele geçirme @ {ok_ep}")
+                await narrate(
+                    ScanEventType.CRITICAL_FINDING,
+                    f"🗝️⛓️ KİMLİK DÜZLEMİ: {host} surunda OTURUM ELE GEÇİRİLDİ "
+                    f"({ok_sig}) — FOOTHOLD + kampanya kilidi kuruldu.",
+                    {"title": ev.title, "target": ok_ep, "severity": "critical",
+                     "confidence_tier": "confirmed", "tool": "cred_replay"})
+        return StageResult(
+            stage_name=stage.name, tool="cred_replay", status="completed",
+            started_at=started.isoformat(), completed_at=datetime.utcnow().isoformat(),
+            duration_seconds=dur,
+            data={"cred_replay_attempts": len(attempts), "cred_replay_confirmed": bool(sig_ok)},
+        )
+
     async def _probe_fac_matrix(self, session: PipelineSession, engine, narrate):
         """T2-A2: Dikey yetki yükseltme / FAC matrisi — idor_probe NESNE bazlı boşluğu
         kanıtlar; bu ROL/İŞLEV bazlı boşluğu kanıtlar (pentest bulgularının bel kemiği,
@@ -6939,6 +7069,139 @@ class ScanPipelineV2:
                                  "chain": f["chain"]})
         except Exception as e:
             logger.debug(f"Exploit zinciri atlandı: {e}")
+
+    async def _harvest_credentials(self, session: PipelineSession, engine, narrate):
+        """KİMLİK DÜZLEMİ probu — "her sızıntı bir kimlik hammaddesidir" (operatör sezgisi).
+
+        Bulgu listesinde duran '.env sızdı / JS'de DSN / wp kullanıcı listesi' kayıtları
+        pasif orta-önem bulgulardır; operatör onları SILAH'A çevirir: credential_plane
+        (SAF) kanıt metinlerinden kimlik çifti/DSN/anahtar/kullanıcı çıkarır →
+        Graph.register_credential CREDENTIAL node üretir ve 'basic' çiftinde bilinen
+        login uçlarına cred_replay KENARI tohumlar (koşumu motor karar verir, icrası
+        _dispatch_cred_replay_native). Böylece izole bulgular killchain'in İLK-ERİŞİM
+        halkasına bağlanır (T1078).
+
+        Maliyet/güvenlik: çıkarım yerel (ağ YOK); sır maskesiz yalnız bellekteki node
+        meta'da; olay kanalı yalnız maske + node id taşır. Yalnız confirmed/probable
+        kanıtlar taranır (unconfirmed metinden kimlik çıkarmak yanlış-kimlik POST'u
+        = hesap kilitleme riski). CRED_PLANE=0 kapatır. Best-effort."""
+        if os.getenv("CRED_PLANE", "1") != "1":
+            return
+        from .credential_plane import harvest_from_evidence, harvest_fingerprint
+        from .exploit_chain import _mask_cred
+        g = engine.graph
+        root = g.nodes.get(g.root_id)
+        if root is None:
+            return
+        seen: set = root.meta.setdefault("cred_seen", set())
+        if len(seen) >= 12:                      # tavan: kimlik enflasyonu → gürültü olmasın
+            return
+        specs = harvest_from_evidence(g.evidence)
+        n_new = n_edges = 0
+        for c in specs:
+            fp = harvest_fingerprint(c)
+            if fp in seen:
+                continue
+            if len(seen) >= 12:
+                break
+            seen.add(fp)
+            node, n_edge = g.register_credential(c)
+            n_new += 1
+            n_edges += n_edge
+            await narrate(
+                ScanEventType.AGENT_THINKING,
+                f"🗝️ Kimlik düzlemi: {c['kind']} '{_mask_cred(c.get('user') or c.get('material') or '—')}' "
+                f"@ {c['host']} graf VARLIĞI oldu"
+                + (f"; {n_edge} cred_replay kenarı tohumlandı — motor sıradaki turda deneyebilir."
+                   if n_edge else "."),
+                {"credential_node": node.id, "kind": c["kind"], "host": c["host"],
+                 "masked": True, "edges_seeded": n_edge, "source": c.get("source")})
+        if n_new:
+            g.notes.append(f"🗝️ Kimlik düzlemi: {n_new} kimlik varlığı (+{n_edges} replay kenarı) "
+                           f"çıkarıldı — bulgular ilk-erişim hammaddesine dönüştü.")
+
+    async def _propagate_verified_patterns(self, session: PipelineSession, engine, narrate):
+        """CROSS-HOST DESEN YAYILIMI — "stack bir surde kanıtlandıysa kardeşlerde de ara".
+
+        Operatör refleksi: aynı taban-domain'in suruları genelde aynı stack'i paylaşır;
+        birinde KANITLANAN zafiyet sınıfı (SQLi/LFI/exposure/...) kardeş host'larda
+        hedefli süpürmeyi hak eder. Motor bunu Kendiliğinden yapmıyordu: host'lar izole
+        sıralı taranıyor, kanıt bir surda kalıyordu. Burada YENİ İSTEK YOK — yalnız
+        kanıtlanmış sınıfa ait nuclei TAG kenarları kardeş host'lara tohumlanır; koşum,
+        eşik, scope ve host-bazlı tag-dedup (_prune_redundant_nuclei_tags) yine motorun.
+
+        Gating: yalnız CONFIRMED kanıttan sınıf; kardeş = graftaki DEAD olmayan HOST
+        node'ları (kök hariç — onun raid/tag kenarları zaten var); sigil bazlı tek sefer.
+        PROPAGATE_PATTERNS=0 kapatır; Keşif seviyesinde çalışmaz. Best-effort."""
+        if os.getenv("PROPAGATE_PATTERNS", "1") != "1":
+            return
+        if str(getattr(session, "level", "") or "").lower() == "recon":
+            return
+        from .attack_graph import NodeType, NodeState, _canon_host
+        g = engine.graph
+        root = g.nodes.get(g.root_id)
+        if root is None:
+            return
+        # Kanıtlanmış sınıflar → nuclei tag kümesi (SAF kelime eşleşmesi; FP bulgu değil
+        # ancak confirmed kademe buraya sınıf taşır).
+        klass_map = (
+            (("sql injection", "sqli", "union select", "blind sql"), {"sqli", "sqli-blind"}),
+            (("xss", "cross-site scripting", "reflected"), {"xss"}),
+            (("lfi", "file inclusion", "path traversal", "/etc/passwd"), {"lfi"}),
+            (("ssrf", "server-side request"), {"ssrf"}),
+            (("command injection", "remote code execution", " rce"), {"rce"}),
+            ((".env", "debug.log", "config leak", "backup file", ".git"),
+             {"exposure", "misconfig"}),
+            (("jwt", "token forge"), {"token", "jwt"}),
+            (("idor", "bola", "broken object"), {"weak-auth", "misconfig"}),
+            (("takeover", "dangling"), {"subdomain-takeover"}),
+        )
+        klass_tags: set = set()
+        for ev in g.evidence:
+            fn = getattr(ev, "effective_confidence_tier", None)
+            if (fn() if callable(fn) else getattr(ev, "confidence_tier", "")) != "confirmed":
+                continue
+            blob = f"{getattr(ev, 'title', '')} {getattr(ev, 'proof', '')}".lower()
+            for keys, tags in klass_map:
+                if any(k in blob for k in keys):
+                    klass_tags |= tags
+        if not klass_tags:
+            return
+        tags = sorted(klass_tags)[:5]
+        base_host = _canon_host(engine.target)
+        done: set = root.meta.setdefault("propagated", set())
+        siblings = [n for n in g.nodes.values()
+                    if n.type == NodeType.HOST and n.state != NodeState.DEAD
+                    and _canon_host(str(n.label)) and _canon_host(str(n.label)) != base_host]
+        added = 0
+        for n in siblings[:6]:
+            h = _canon_host(str(n.label))
+            sig = f"prop|{h}|{','.join(tags)}"
+            if sig in done:
+                continue
+            done.add(sig)
+            edge = Edge(
+                from_id=g.root_id, to_id=n.id, tool="nuclei",
+                options={"tags": tags, "severity": list(_DEFAULT_SEVERITY)},
+                cost=25.0, success_prob=0.35, urgency=1.25,
+                rationale=(f"Desen yayılımı: {','.join(tags)} sınıfı kök surda KANITLANDI; "
+                           f"aynı taban-domain kardeşi {h} hedefli süpürülür "
+                           f"(operatör: 'stack bir yerde çalıştıysa burada da dene')."),
+                meta={"propagated": True},
+            )
+            if edge.key() not in g.edges:      # 'yeni mi' eklemeden önce sorulur
+                g.add_edge(edge)
+                added += 1
+        if added:
+            g.notes.append(
+                f"🕸️ Desen yayılımı: {added} kardeş hostta hedefli tag süpürmesi tohumlandı "
+                f"(sınıflar: {','.join(tags)}).")
+            await narrate(
+                ScanEventType.AGENT_THINKING,
+                f"🕸️ Kanıtlanmış saldırı deseni {added} kardeş sura yayıldı — "
+                f"hedefli tag süpürmesi kuyrukta ({','.join(tags)}).",
+                {"propagated_hosts": added, "tags": tags})
+
 
     async def _synthesize_combinations(self, session: PipelineSession, engine, narrate):
         """APT doktrini — KOMBİNASYON KENARLARI. Tek başına düşük CONFIRMED bulguları birleştirip

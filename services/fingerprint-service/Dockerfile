@@ -1,6 +1,6 @@
 # Kadim Güvenlik — fingerprint-service (wappalyzergo)
 # Çok aşamalı: derleme aşamasında bağımlılık `go get` ile çözülür → bakım = `go get -u`.
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache git
 COPY go.mod ./

@@ -42,7 +42,7 @@ Otonom güvenlik tarama platformu. Her araç (nmap, nuclei, subfinder, recon, os
 3. Terminal: `STOP` / `REQUEST_APPROVAL` / `PHASE_GATE` (keşif→sömürü onay kapısı).
 4. **ACT** `to_stage()` → `dispatcher.dispatch` (8sn heartbeat, iptal ≤8sn). Artifact sakla; düşen aşama `is_degraded`→WARNING.
 5. **OBSERVE** `observe(decision,data,status)`: grafa yaz, `AdaptiveScanner` besle, öğren → yeni Evidence sayısı.
-6. Post-observe (best-effort, playbook-gate'li): `_verify_new_evidence`, `_annotate_catchall_findings` (FP demote), `_adjudicate_unconfirmed`, WAF fingerprint, `_probe_discovered_services`/`_kubernetes`/`_wordpress`/`_wp_sqli`/`_idor`/`_web_misconfig`/`_deserialization`, `_execute_chains`, `_synthesize_combinations`, `_redteam_llm_endpoints`.
+6. Post-observe (best-effort, playbook-gate'li): `_verify_new_evidence`, `_annotate_catchall_findings` (FP demote), `_adjudicate_unconfirmed`, WAF fingerprint, `_probe_discovered_services`/`_kubernetes`/`_wordpress`/`_wp_sqli`/`_idor`/`_web_misconfig`/`_deserialization`, `_execute_chains`, `_synthesize_combinations`, `_redteam_llm_endpoints`, `_harvest_credentials` (kimlik düzlemi: sızıntı→CREDENTIAL node+`cred_replay` kenarı; icra `_dispatch_cred_replay_native` → kanıtlıysa FOOTHOLD+kilit), `_propagate_verified_patterns` (kanıtlı sınıf→kardeş host hedefli tag süpürmesi), `engine.propose_attack_path` (LLM path-proposer: kanıttan TEK hamle→beyaz-listeli doğrulanmış kenar). **Kampanya kilidi:** confirmed high/critical kanıtın hostunda bütçe derinleşir (odak çarpanı + erken-stop bastırması; `engine._focus_host`, `CAMPAIGN_LOCK*`).
 
 **Çıkış:** `engine.summary()` (+stage_health+coverage) → `session.ai_analysis`; `_save_autonomous_evidence`; `emit_scan_completed`; `_trigger_autonomous_report` → ai-service `POST /brain/analyze/v2`.
 
@@ -66,7 +66,7 @@ cd frontend && pnpm dev              # frontend dev (pnpm, npm DEĞİL)
 python3 orchestrator/pipeline/test_playbook.py   # test = düz script (pytest yok)
 ```
 Tarama başlat: `curl -X POST http://localhost:5566/api/v2/scan -H 'Content-Type: application/json' -d '{"target":"example.com","profile":"autonomous","level":"standard"}'`
-Env (`.env`): `AUTONOMOUS_MAX_STEPS/MAX_SECONDS/LLM_DISABLE/SCOPE/SEVERITY_FLOOR`; prob flag'leri (`WP_PROBE`, `IDOR_PROBE`, `COMBO_CHAINS`, `KEV_INTEL_ENABLED`, `TARGET_PROFILING`, ...) çoğu **varsayılan AÇIK** (getenv `"1"`/`"true"`).
+Env (`.env`): `AUTONOMOUS_MAX_STEPS/MAX_SECONDS/LLM_DISABLE/SCOPE/SEVERITY_FLOOR`; prob flag'leri (`WP_PROBE`, `IDOR_PROBE`, `COMBO_CHAINS`, `KEV_INTEL_ENABLED`, `TARGET_PROFILING`, `CAMPAIGN_LOCK(_STEPS/_FOCUS_MULT)`, `CRED_PLANE`, `PROPAGATE_PATTERNS`, `PATH_PROPOSER(_EVERY)`, ...) çoğu **varsayılan AÇIK** (getenv `"1"`/`"true"`). Operatör disiplini testi: `python3 orchestrator/pipeline/test_operator_doctrine.py`.
 
 ## 6. Konvansiyonlar
 - Yorumlar Türkçe, "neden"i açıklar. Log/değişken de Türkçe.

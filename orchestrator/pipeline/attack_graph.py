@@ -742,6 +742,91 @@ class Graph:
         self.edges[k] = edge
         return edge
 
+    # ---------- KİMLİK DÜZLEMİ (Credential Plane) ----------
+
+    def register_credential(self, cred: Dict[str, Any]) -> Tuple[Node, int]:
+        """Sızıntı bulgusundan çıkarılan kimliği graf VARLIĞINA çevir: bulgu → silah.
+
+        Operatör disiplini: kanıt listesinde duran 'exposed .env' bulgusu ile o .env'den
+        çıkan kimlik farklı şeylerdir — kimlik, hedefin login yüzlerinde DENENEBİLİR bir
+        saldırı kenarıdır (T1078). CREDENTIAL node her türde doğar (killchain/rapor/
+        path-proposer yakıtı); 'basic' çiftinde bilinen login uçlarına cred_replay KENARI
+        tohumlanır (icracı: pipeline._dispatch_cred_replay_native).
+
+        GİZLİLİK: ham sır YALNIZ node.meta'da yaşar (compact_state/summary/rapor meta
+        yayınlamaz; olay kanalı yalnız node id/maske taşır). Kenar options'ında sır
+        DÖNÜŞTÜRÜLMEMİŞ taşınmaz — icracı node.meta'dan okur. Returns (node, yeni_kenar).
+        """
+        host = _canon_host(str(cred.get("host") or self.target))
+        kind = str(cred.get("kind") or "basic")
+        user = str(cred.get("user") or "")
+        secret = str(cred.get("secret") or "")
+        import hashlib as _hl
+        seed = f"{kind}|{host}|{user}|{cred.get('material') or secret}"
+        node_id = f"cred:{host}:{kind}:{_hl.sha1(seed.encode('utf-8', 'replace')).hexdigest()[:10]}"
+        node = self.add_node(Node(
+            id=node_id, type=NodeType.CREDENTIAL,
+            label=f"{'kullanıcı' if kind == 'username' else 'kimlik'}: {user or kind} @ {host}",
+            value=75.0 if kind in ("basic", "db_conn") else 68.0,
+            breach_prob=0.4 if kind in ("basic", "db_conn") else 0.2,
+            state=NodeState.DISCOVERED,
+            meta={"host": host, "kind": kind, "user": user,
+                  "source": cred.get("source"), "secret": secret,
+                  "material": cred.get("material")},
+        ))
+        if kind != "basic" or not user or not secret:
+            return node, 0
+
+        # Login uçları: yalnız GRAFTA BİLİNEN endpoint'ler (hayali yol POST'lanmaz —
+        # 404'e kimlik denemek hem israf hem gereksiz iz bırakır). ≤3 uç.
+        root = self.nodes.get(self.root_id)
+        pool = [u for u in ((root.meta.get("endpoints") if root else None) or [])
+                if isinstance(u, str) and u.startswith(("http://", "https://"))
+                and any(h in u.lower() for h in
+                        ("login", "signin", "auth", "wp-login", "giris", "sso", "cas", "token"))]
+        if host != _canon_host(self.target):
+            pool = [u for u in pool if _canon_host(u) == host]
+        pool = list(dict.fromkeys(pool))[:3]
+        if not pool:
+            return node, 0
+
+        host_node = self.nodes.get(f"host:{host}")
+        edge = Edge(
+            from_id=self.root_id,
+            to_id=host_node.id if host_node else self.root_id,
+            tool="cred_replay",
+            options={"cred_node": node_id, "login_eps": pool,
+                     **({"scan_target": host} if host != _canon_host(self.target) else {})},
+            cost=15.0, success_prob=0.35, urgency=1.5,
+            rationale=(f"Kimlik düzlemi: sızan kimlik ({user}) {len(pool)} bilinen login "
+                       f"ucunda yanlış-kimlik baseline'ıyla denenir (T1078). "
+                       f"Kaynak: {cred.get('source', '?')}"),
+            meta={"cred_plane": True},
+        )
+        # 'yeni mi' anahtarı EKLEMEDEN ÖNCE sorulur — add_edge mevcut kenarı geri döndürdüğü
+        # için 'is' kıyası mevcut kenarı da yeni sayardı (dedup deliği, test yakaladı).
+        is_new = edge.key() not in self.edges
+        self.add_edge(edge)
+        return node, (1 if is_new else 0)
+
+    def register_foothold(self, host: str, proof: str, via: str = "") -> Node:
+        """Kanıtlı İLK-ERİŞİM varlığı (FOOTHOLD): killchain halkası + 'sur düştü' sinyali.
+
+        Host node BREACHED'a ilerler → info_relevance oradaki kovalamayı söndürür,
+        killchain_driver ilk-erişim→etki fazına ağırlık verir. Kanıt yokken ÇAĞRILMAZ
+        (imzasız replay sonucu 'bilinmiyor'dur, foothold değildir)."""
+        h = _canon_host(host) or _canon_host(self.target)
+        node = self.add_node(Node(
+            id=f"foothold:{h}", type=NodeType.FOOTHOLD,
+            label=f"FOOTHOLD @ {h}", value=90.0, breach_prob=1.0,
+            state=NodeState.BREACHED,
+            meta={"proof": (proof or "")[:300], "via": via},
+        ))
+        hn = self.nodes.get(f"host:{h}")
+        if hn is not None:
+            hn.state = NodeState.BREACHED
+        return node
+
     # ---------- Dinamik CVE istihbaratı ----------
 
     async def enrich_cve_intelligence(self) -> Dict[str, Any]:

@@ -45,7 +45,7 @@ from .adaptive_scanner import AdaptiveScanner
 from .attack_graph import (
     Graph, Edge, siege_score, THRESHOLD, EDGE_COST_TABLE,
     objective_score, selection_score, info_relevance, INFO_GAIN_OBJECTIVE, INFO_GAIN_MIN,
-    NodeState, NodeType,
+    NodeState, NodeType, _canon_host,
 )
 from .scan_profiles import StageDefinition
 from .pause_control import PauseGate
@@ -166,6 +166,13 @@ TOOL_CATALOG: Dict[str, str] = {
                       "Tahribatsız (yalnız GET, örnek kapaklı). app_type=api ve nesne-referanslı "
                       "endpoint bulununca en değerli aktif hamle — kör tarama değil, bilinçli "
                       "yetki-boşluğu istismarı (TEB senaryosu).",
+    # KİMLİK DÜZLEMİ (orchestrator-yerli): sızan kimliği yeniden kullan — operatörün
+    # ilk-erişim otoyolu (T1078 Valid Accounts). Sır ham olarak olaya/kanıta YAZILMAZ;
+    # icracı CREDENTIAL node meta'sından okur, yanlış-kimlik baseline'ıyla kıyaslar.
+    "cred_replay": "Sızan/çıkarılan kimliği hedefin BİLİNEN login uçlarında yanlış-kimlik "
+                   "baseline'ıyla dener; imzalı kabul (panel yönlendirmesi/auth-cookie/oturum "
+                   "sayfası) = kanıtlı oturum ele geçirme + FOOTHOLD. ≤3 uç, ≤2 POST/uç, "
+                   "tahribatsız. Keşif seviyesinde kapalı (aktif araç).",
 }
 
 # Hangi aracın hedefi ne türde olmalı
@@ -186,7 +193,7 @@ PASSIVE_DISCOVERY_TOOLS: Set[str] = {"recon", "subfinder", "osint", "origin_disc
 # keşfi yapar (enjeksiyon DENEMEZ). pathprobe ile aynı aktif-tier sınıfta; Standart+
 # seviyede çalışır (Keşif'te `allow_crawl=False` ile kapalı).
 ACTIVE_TOOLS: Set[str] = {"nmap", "rustscan", "nuclei", "fuzz", "pathprobe", "crawl",
-                          "probe_api_bola"}
+                          "probe_api_bola", "cred_replay"}
 
 
 # ============================================================
@@ -393,6 +400,82 @@ def derive_confidence_tier(*, verified: Optional[bool], verification_method: Opt
     return "unconfirmed"            # ham araç iddiası (nuclei severity vb.) — bağımsız kontrol yok
 
 
+# ============================================================
+# OPERATÖR DİSİPLİNİ: KAMPANYA KİLİDİ + PATH-PROPOSER
+# ============================================================
+# Kuşatma doktrinine iki operatör sezgisi ekler (yol haritası: "genişlik yerine derinlik"):
+#  1) KAMPANYA KİLİDİ — kanıtlı high/critical bulgu çıkan surda bütçeyi YAYMAK yerine oraya
+#     GÖM. Greedy global re-score bunu doğal yapmaz: ilk eşiği geçen kenara atlar, koku
+#     alınan host'u yarıda bırakır (operatör "bir suru düşürene kadar kazır").
+#  2) PATH-PROPOSER — LLM'e skor-girdisi değil "elindeki kanıtlarla SIRADAKİ TEK HAMLEN ve
+#     hedeflediğin YOL" sorulur; çıktı yalnız doğrulanmış graf kenarıdır (araç dispatch
+#     evreninden, host bilinen varlıklardan). Karar/icra yine deterministik motorun —
+#     doktrin bozulmaz: danışman kral değil, ama tabanca da kılıfta durmaz.
+# Her iki bayrak kapalıyken davranış birebir eski hâlidir.
+CAMPAIGN_LOCK = os.getenv("CAMPAIGN_LOCK", "1") == "1"
+# Kilit süresi (adım): yeni kanıt geldikçe tazelenir; süre dolunca kuşatma normale döner.
+CAMPAIGN_LOCK_STEPS = max(3, int(os.getenv("CAMPAIGN_LOCK_STEPS", "10")))
+# Odak surunun kenarlarına skor çarpanı — sıralamada öne çıkarır, diğerlerini ezmez.
+CAMPAIGN_FOCUS_MULT = max(1.0, float(os.getenv("CAMPAIGN_FOCUS_MULT", "2.2")))
+# Kilit yalnız bu şiddetlerdeki CONFIRMED kanıtla döşenir (medium gürültüsü kilit açmaz).
+FOOTHOLD_SEVERITIES = ("critical", "high")
+# Path-proposer seyrekliği: her N adımda bir, yalnız CONFIRMED kanıt varken danışılır.
+PATH_PROPOSER = os.getenv("PATH_PROPOSER", "1") == "1"
+PATH_PROPOSER_EVERY = max(2, int(os.getenv("PATH_PROPOSER_EVERY", "4")))
+PATH_PROPOSER_MIN_STEP = max(1, int(os.getenv("PATH_PROPOSER_MIN_STEP", "6")))
+PATH_PROPOSER_MAX_MOVES = max(1, int(os.getenv("PATH_PROPOSER_MAX_MOVES", "2")))
+# Öneri yalnız motorun GERÇEKTEN koşabildiği araçlara dönüşebilir (dispatch_map evreni).
+PATH_PROPOSER_TOOLS = {
+    "nmap", "nuclei", "subfinder", "rustscan", "fuzz", "recon", "osint",
+    "nmap_real_ip", "origin_discovery", "reverse_ip", "pathprobe", "crawl",
+}
+# LLM opsiyonlarından geçmesine izin verilecek ANAHATARLAR — custom_cmd/nmap_args gibi
+# kabiliyet-kaçışına açık alanlar beyaz-listede YOK (dispatch yüzeyi LLM'e kapalı).
+PATH_PROPOSER_SAFE_OPTS = {"tags", "severity", "scan_type", "depth", "preset", "top_ports"}
+
+
+def _parse_move_json(raw: str) -> list:
+    """Path-proposer cevabından moves[] çıkar (SAF): ilk dengeli {...} dilimi + json.loads.
+    Bozuk/şemasız cevap → boş liste (motor kural-fallback ile sürer, asla raise etmez)."""
+    if not raw:
+        return []
+    start = raw.find("{")
+    if start < 0:
+        return []
+    depth = 0
+    end = -1
+    in_str = False
+    esc = False
+    for i, ch in enumerate(raw[start:], start):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end < 0:
+        return []
+    try:
+        data = json.loads(raw[start:end + 1])
+    except Exception:
+        return []
+    moves = data.get("moves") if isinstance(data, dict) else None
+    if not isinstance(moves, list):
+        return []
+    return [m for m in moves if isinstance(m, dict)]
+
+
 @dataclass
 class Evidence:
     """Doğrulanmış zafiyet kanıtı — kurumsal raporun çekirdeği.
@@ -593,6 +676,15 @@ class AutonomousEngine:
         # maliyeti sıfır; LOOP_GUARD_ENABLED=0 ile kapanır (ceza hep 1.0 → davranış birebir).
         from .behavior_monitor import BehaviorMonitor
         self._behavior = BehaviorMonitor()
+
+        # KAMPANYA KİLİDİ durumu (bkz. CAMPAIGN_LOCK açıklaması):
+        self._focus_host: Optional[str] = None      # kanonik host — odak suru
+        self._focus_until_step: int = 0             # bu adıma kadar geçerli (kanıtla tazelenir)
+        self._focus_just_set: bool = False          # bir sonraki next_decision'da bir kez yayınlansın
+        self._focus_locks: int = 0                  # kaç kez döşendi/tazelendi (gözlemlilik)
+        # PATH-PROPOSER duruşu: son danışma adımı + denenmiş hamle imzaları (tekrar elenir).
+        self._last_proposal_step: int = -(10 ** 9)
+        self._path_seen: Set[str] = set()
 
     # ---------- Scope (yetki sınırı) ----------
     def _cohosted_blocked(self, edge: Edge) -> bool:
@@ -1201,28 +1293,54 @@ class AutonomousEngine:
                                      "behavior_monitor": self._behavior.durum()})
                 except Exception:
                     pass  # narrate düşse bile karar akışı durmaz
-        scored = [(e, selection_score(e, self.graph, self.step) * self._behavior.ceza(e.tool))
+        # KAMPANYA KİLİDİ olayı: kilit yeni döşendiyse operatöre bir kez bildir (tekrar
+        # tazelemeler sessiz — narrative gürültüsü olmaz, graf note zaten güncel).
+        if self._focus_just_set:
+            self._focus_just_set = False
+            if self.emit:
+                try:
+                    from .scan_events import ScanEventType
+                    await self.emit(
+                        ScanEventType.AGENT_THINKING,
+                        f"🔒 Kampanya kilidi: bütçe artık {self._focus_host} surunda "
+                        f"derinleşiyor (adım {self.step}–{self._focus_until_step}); "
+                        f"yayılmak donduruldu, kanıt geldikçe süre uzar.",
+                        {"step": self.step, "focus_host": self._focus_host,
+                         "focus_until_step": self._focus_until_step})
+                except Exception:
+                    pass  # narrate düşse karar akışı durmaz
+        # Kampanya kilidi: odak surunun çarpanını uygula ve ODAK KENARLARINI başa al —
+        # kilitliyken eşik-altı odak kenarı bile denenir (tavan = kilit süresi; başarısızlık
+        # beta-backoff ile zaten söner). Çarpan 1.0 iken (bayrak kapalı) sıralama birebir eski.
+        scored = [(e, selection_score(e, self.graph, self.step) * self._behavior.ceza(e.tool)
+                   * self._focus_mult(e))
                   for e in open_edges]
-        scored.sort(key=lambda x: x[1], reverse=True)
+        scored.sort(key=lambda x: (self._focus_mult(x[0]) > 1.0, x[1]), reverse=True)
         considered = [
             {"tool": e.tool, "score": round(s, 3), "target_node": e.to_id}
             for e, s in scored[:5]
         ]
 
         if not scored or scored[0][1] < self.level.threshold:
-            decision = Decision(
-                action=DecisionAction.STOP,
-                reasoning="Skorların hepsi eşiğin altında — deneyecek mantıklı adım kalmadı. "
-                          "Toplanan bulgular raporlanıyor.",
-                confidence=0.9, source="rules",
-            )
-            return decision, considered
+            # KAMPANYA KİLİDİ: sur henüz düşmediyse erken pes yok — odak kenarı varsa
+            # devam (aşağıdaki döngü eşik-altı odak adayını da dener; tavan kilit süresi).
+            if not (self._focus_active() and scored and scored[0][1] > 0
+                    and self._focus_mult(scored[0][0]) > 1.0):
+                decision = Decision(
+                    action=DecisionAction.STOP,
+                    reasoning="Skorların hepsi eşiğin altında — deneyecek mantıklı adım kalmadı. "
+                              "Toplanan bulgular raporlanıyor.",
+                    confidence=0.9, source="rules",
+                )
+                return decision, considered
 
         # DOĞAL DURMA KRİTERİ (bilgi-kazanımı): en bilgilendirici açık kenar bile eşiğin
         # altındaysa, geriye kalan her şey ya zaten kanıtlanmış ya tükenmiş demektir —
         # "öğrenilecek/kanıtlanacak yeni şey yok" → dur. (Yalnız INFO_GAIN açıkken; kör
         # 472-listeleme yerine "ispatlayacak kadarını ispatla, dur".)
-        if INFO_GAIN_OBJECTIVE:
+        # (Kampanya kilidi aktifken bu doğal-durma ATLANIR: "öğrenilecek şey kalmadı"
+        # yargısı odak suru için erken — kilit süresi zaten doğal tavan.)
+        if INFO_GAIN_OBJECTIVE and not self._focus_active():
             max_rel = max((info_relevance(e, self.graph) for e, _ in scored), default=0.0)
             if max_rel < INFO_GAIN_MIN:
                 return Decision(
@@ -1239,7 +1357,10 @@ class AutonomousEngine:
         # bütçe sessizce yakılıyordu. Artık aynı tur içinde sıradaki adaya geçilir.
         for best_edge, best_score in scored:
             if best_score < self.level.threshold:
-                break  # scored azalan sıralı → bundan sonrası da eşik altı, dene­meye değmez
+                # Kampanya kilidi: odak surunun kenarı EŞİK ALTI da olsa denenir (kazma
+                # devam eder; tavan = kilit süresi + beta-backoff). Kilit yoksa davranış birebir.
+                if not (self._focus_active() and self._focus_mult(best_edge) > 1.0):
+                    break  # scored azalan sıralı → bundan sonrası da eşik altı, dene­meye değmez
             decision = self._edge_to_decision(best_edge, best_score)
             validated = self._validate(decision, best_edge, self.graph)
             if validated is not None:
@@ -1280,6 +1401,109 @@ class AutonomousEngine:
     # Son danışmanın parse edilip edilemediği. next_decision bunu event'e taşır; UI parse
     # başarısızsa "🔁 LLM'e yeniden danış" aksiyonu gösterir (kullanıcı-tetiklemeli retry).
     _last_appraise_parse_failed: bool = False
+
+    async def propose_attack_path(self) -> int:
+        """OPERATÖR PATH-PROPOSER — appraise'den farkı: LLM'e skor-girdisi değil, KIRMIZI
+        TAKIM HAMLESİ sorulur: "elindeki KANITLAR, varlıklar ve sızan kimliklerle sıradaki
+        tek hamlen ne; hangi yolu hedefliyorsun?" (foothold→...→amaç).
+
+        Güvenlik ağı (doktrin korunur — danışman kral değil):
+          * araç YALNIZ PATH_PROPOSER_TOOLS'tan (dispatch evreni),
+          * host YALNIZ grafla bilinen CANLI varlıklardan (hayalî host reddi),
+          * opsiyonlar YALNIZ beyaz-listeden (custom_cmd/nmap_args geçemez),
+          * çıktı yalnız graf KENARI olur — koşum/eşik/scope/guardrail yine motorun;
+          * kanıt (CONFIRMED) yokken danışılmaz, LLM düşerse 0 döner, akış etkilenmez.
+        Seyrek + ucuz: her PATH_PROPOSER_EVERY adımda tek atış, tamir turu yok.
+        Dönen: eklenen yeni kenar sayısı."""
+        if not PATH_PROPOSER or self._llm_disabled or not self._llm_healthy:
+            return 0
+        if self.step < PATH_PROPOSER_MIN_STEP:
+            return 0
+        if self.step - self._last_proposal_step < PATH_PROPOSER_EVERY:
+            return 0
+        if self._phase == "recon" and REQUIRE_RECON_APPROVAL:
+            return 0
+        g = self.graph
+        # Yakıt: en az bir CONFIRMED kanıt — ham yüzey için proposer değil, RAID floor yeter.
+        confirmed = []
+        for ev in g.evidence:
+            fn = getattr(ev, "effective_confidence_tier", None)
+            if (fn() if callable(fn) else getattr(ev, "confidence_tier", "")) == "confirmed":
+                confirmed.append(ev)
+        if not confirmed:
+            return 0
+        self._last_proposal_step = self.step
+
+        creds = [{"host": (n.meta or {}).get("host"), "kind": (n.meta or {}).get("kind"),
+                  "user": (n.meta or {}).get("user")}
+                 for n in g.nodes.values() if n.type == NodeType.CREDENTIAL][:8]
+        alive = [n for n in g.nodes.values()
+                 if n.type in (NodeType.HOST, NodeType.TARGET) and n.state != NodeState.DEAD]
+        hosts = {_canon_host(str(n.label)) for n in alive}
+        hosts.discard("")
+        state = g.compact_state()
+        user = json.dumps({
+            "surface": {k: state.get(k) for k in
+                        ("target", "technologies", "open_ports", "subdomains", "endpoints",
+                         "injectable_endpoints", "forms")},
+            "confirmed_evidence": [{"title": getattr(e, "title", ""), "target": e.target,
+                                    "severity": e.severity,
+                                    "method": getattr(e, "verification_method", None)}
+                                   for e in confirmed[:10]],
+            "credentials": creds,
+            "hosts_alive": sorted(hosts)[:15],
+            "executed_tools": state.get("executed_tools", []),
+            "campaign_focus": self._focus_host if self._focus_active() else None,
+            "notes": g.notes[-6:],
+        }, ensure_ascii=False, default=str)[:14_000]
+        system = (
+            "Sen 20 yıllık red team liderisin. Verili KANITLAR ve YÜZEY üzerinden bir "
+            "sonraki tek/iki hamleyi öner. KURALLAR: yalnız hosts_alive listesindeki bir "
+            "host'u hedefle; yalnız şu araçlardan birini seç: "
+            + ", ".join(sorted(PATH_PROPOSER_TOOLS)) +
+            ". Bulgu listeleme — uygulanabilir TEK komutluk hamle + gerekçe + hedeflenen "
+            "yol (foothold→...→amaç) yaz. options alanı zorunlu değil. SADECE JSON: "
+            '{"moves":[{"tool":"...","host":"...","options":{},"rationale":"...","path":"..."}]}')
+        raw = await self.llm_complete(system, user, max_tokens=700, temperature=0.2)
+        if not raw:
+            return 0
+        added = 0
+        for mv in _parse_move_json(raw)[:PATH_PROPOSER_MAX_MOVES]:
+            tool = str(mv.get("tool") or "").strip().lower()
+            if tool not in PATH_PROPOSER_TOOLS:
+                continue
+            host = _canon_host(str(mv.get("host") or "")) or _canon_host(self.target)
+            if host not in hosts:
+                continue  # hayalî host yasak — yalnız bilinen canlı varlıklar
+            opts: Dict[str, Any] = {}
+            raw_opts = mv.get("options")
+            if isinstance(raw_opts, dict):
+                for k, v in raw_opts.items():
+                    if k in PATH_PROPOSER_SAFE_OPTS and isinstance(v, (str, int, float, bool)):
+                        opts[k] = v
+            if host != _canon_host(self.target):
+                opts["scan_target"] = host
+            sig = f"proposed|{tool}|{host}|{sorted(opts.items())}"
+            if sig in self._path_seen:
+                continue
+            self._path_seen.add(sig)
+            node_id = next((n.id for n in g.nodes.values()
+                            if _canon_host(str(n.label)) == host
+                            and n.type in (NodeType.HOST, NodeType.TARGET)), g.root_id)
+            rationale = str(mv.get("rationale") or "operatör path önerisi")[:160]
+            path = str(mv.get("path") or "")[:160]
+            edge = Edge(
+                from_id=g.root_id, to_id=node_id, tool=tool, options=opts,
+                success_prob=0.5, urgency=1.35,
+                rationale=f"🧭 Path önerisi: {rationale}" + (f" | yol: {path}" if path else ""),
+                meta={"from_llm": True, "path_proposal": True},
+            )
+            if edge.key() not in g.edges:      # 'yeni mi' eklemeden önce sorulur
+                g.add_edge(edge)
+                added += 1
+        if added:
+            g.notes.append(f"🧭 Path-proposer {added} saldırı kenarı önerdi (adım {self.step}).")
+        return added
 
     async def appraise(self, graph: Graph, *, force_retry: bool = False) -> Optional[Dict[str, Any]]:
         """
@@ -2074,6 +2298,41 @@ class AutonomousEngine:
             d.stage_name = f"{d.tool}_step{self.step}"
         return d
 
+    # ---------- KAMPANYA KİLİDİ (operatör scheduling disiplini) ----------
+
+    def _lock_focus(self, host: str, reason: str) -> None:
+        """Odak surunu döşet veya tazele. Kanıt geldikçe süre uzar; motor o sura gömülür."""
+        host = _canon_host(host)   # URL/wwww/PORT → kanonik host (çağıranı da savunmasız bırakma)
+        if not CAMPAIGN_LOCK or not host:
+            return
+        if self._focus_host != host:
+            self._focus_just_set = True
+        self._focus_host = host
+        self._focus_until_step = max(self._focus_until_step, self.step) + CAMPAIGN_LOCK_STEPS
+        self._focus_locks += 1
+        self.graph.notes.append(
+            f"🔒 Kampanya kilidi → {host} (adım {self.step}–{self._focus_until_step}): {reason}")
+
+    def _focus_active(self) -> bool:
+        return bool(CAMPAIGN_LOCK and self._focus_host
+                    and self.step <= self._focus_until_step)
+
+    def _edge_host(self, edge: Edge) -> str:
+        """Kenarınfiilen hedeflediği kanonik host: scan_target > HOST node > kök hedef."""
+        st = (edge.options or {}).get("scan_target")
+        if st:
+            return _canon_host(str(st))
+        node = self.graph.nodes.get(edge.to_id)
+        if node is not None and node.type == NodeType.HOST and node.label:
+            return _canon_host(str(node.label))
+        return _canon_host(self.target)
+
+    def _focus_mult(self, edge: Edge) -> float:
+        """Odak surunun kenarları çarpanla öne çıkar; kilit yoksa/pasifse birebir 1.0."""
+        if not self._focus_active():
+            return 1.0
+        return CAMPAIGN_FOCUS_MULT if self._edge_host(edge) == self._focus_host else 1.0
+
     # ---------- Gözlem: sonucu grafa işle + kanıt topla ----------
     # ---------- Akıllı tarama: tekrar nuclei tag-taramasını önleme ----------
     @staticmethod
@@ -2152,6 +2411,22 @@ class AutonomousEngine:
         prev_evidence = len(self.graph.evidence)
         self.graph.integrate(decision, result_data, tool)
         new_evidence = len(self.graph.evidence) - prev_evidence
+
+        # KAMPANYA KİLİDİ: bu turda düşen CONFIRMED high/critical kanıt → bütçe artık o
+        # surda derinleşir (operatör foothold kokusu alınca yayılmayı dondurur). Kilit iyi-
+        # olundan bir ekstralıktır: hata ana akışı asla durdurmaz, flag kapalıyken sıfır maliyet.
+        if CAMPAIGN_LOCK and new_evidence > 0:
+            try:
+                for _ev in self.graph.evidence[prev_evidence:]:
+                    _fn = getattr(_ev, "effective_confidence_tier", None)
+                    _tier = _fn() if callable(_fn) else getattr(_ev, "confidence_tier", "")
+                    if _tier == "confirmed" and getattr(_ev, "severity", "") in FOOTHOLD_SEVERITIES:
+                        self._lock_focus(
+                            _canon_host(getattr(_ev, "target", "") or ""),
+                            f"{getattr(_ev, 'tool', '?')}: {getattr(_ev, 'title', '')[:70]}")
+                        break
+            except Exception:
+                pass
 
         if edge:
             self.graph.update_probabilities(edge, success=True, evidence_found=new_evidence > 0)
