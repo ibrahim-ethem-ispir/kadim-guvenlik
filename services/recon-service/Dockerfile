@@ -1,5 +1,6 @@
 # Build Stage
-FROM rust:1.91-slim-bullseye as builder
+# bullseye EOL → depoda 404; bookworm'a geçildi (builder+runtime birlikte değişmeli, libssl ABI hizası)
+FROM rust:1.91-slim-bookworm as builder
 
 WORKDIR /app
 
@@ -19,14 +20,15 @@ RUN touch src/main.rs
 RUN cargo build --release
 
 # Runtime Stage
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
 # Gerekli runtime kütüphaneleri (OpenSSL vb.)
-RUN apt-get update && apt-get install -y \
+# libssl-dev build-time gerekir, runtime'a gerek yok; libssl3 bookworm tabanında zaten var
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    libssl-dev \
+    libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Builder aşamasından binary'i kopyala
