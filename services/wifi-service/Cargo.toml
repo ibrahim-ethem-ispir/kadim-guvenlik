@@ -1,4 +1,4 @@
-# Bu paket kendi workspace köküdür: services/ kökündeki ortak workspace'ten
+# Bu paket kendi workspace köküdür: services/rust/ altındaki ortak workspace'ten
 # BİLİNÇLİ olarak hariç (Kali base + actix-web, ortak bağımlılık grafiği yok).
 # Aksi halde kendi Docker context'inden derlenirken "workspace bulunamadı" hatası verir.
 [workspace]

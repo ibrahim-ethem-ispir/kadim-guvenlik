@@ -283,20 +283,23 @@ kadim-guvenlik/
 │   │   ├── threat_intel_engine.py # Tehdit istihbaratı
 │   │   ├── report_engine.py     # Rapor/analiz motoru
 │   │   └── agents/              # orchestrator / recon / vuln_scanner ajanları
-│   ├── auth-service/            # 🔐 JWT Auth (Rust)
-│   ├── hash-cracker/            # 🔑 Hash Cracker (Rust)
-│   ├── osint-service/           # 🌐 OSINT Intelligence (Rust)
-│   ├── stress-service/          # ⚡ Stress / yük testi (Rust)
-│   ├── researcher-service/      # 🔬 Zero-Day Researcher (Rust)
-│   ├── fuzz-service-rs/         # 🎯 Fuzzing (Rust + Feroxbuster)
+│   ├── rust/                    # 🦀 Rust servisleri (tek Cargo workspace + tek Dockerfile)
+│   │   ├── Cargo.toml           # workspace: 7 üye, tek Cargo.lock, tek release profili
+│   │   ├── Dockerfile           # SERVICE/BIN/PORT argümanlı ortak build hattı
+│   │   ├── auth-service/        # 🔐 JWT Auth
+│   │   ├── hash-cracker/        # 🔑 Hash Cracker
+│   │   ├── osint-service/       # 🌐 OSINT Intelligence
+│   │   ├── stress-service/      # ⚡ Stress / yük testi
+│   │   ├── researcher-service/  # 🔬 Zero-Day Researcher
+│   │   ├── fuzz-service-rs/     # 🎯 Fuzzing (+ Feroxbuster)
+│   │   └── recon-service/       # 📡 Recon Intelligence
 │   ├── crawler-service/         # 🕷️ Headless (JS-render) crawler
 │   ├── fingerprint-service/     # 🆔 Teknoloji parmak izi (Go / wappalyzergo)
-│   ├── recon-service/           # 📡 Recon Intelligence (Rust)
 │   ├── nmap-service/            # 🔍 Nmap (Python)
 │   ├── rustscan-service/        # ⚡ RustScan (Python)
 │   ├── nuclei-service/          # 🛡️ Nuclei (Python)
 │   ├── subfinder-service/       # 📍 Subfinder (Python)
-│   └── wifi-service/            # 📶 Wi-Fi Audit (Rust)
+│   └── wifi-service/            # 📶 Wi-Fi Audit (Rust — ayrı workspace, Kali base)
 ├── nginx/                       # Reverse proxy config
 └── docker-compose.yml           # Servis orkestrasyonu
 ```

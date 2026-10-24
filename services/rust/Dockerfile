@@ -4,7 +4,7 @@
 # =============================================================================
 # Neden tek Dockerfile: 7 Rust servisi aynı crate ağacını (tokio, axum, serde,
 # mongodb, reqwest, tracing ...) ayrı ayrı derliyordu. Burada:
-#   * build context = services/ (workspace kökü), bağımlılıklar TEK kez derlenir
+#   * build context = services/rust/ (workspace kökü), bağımlılıklar TEK kez derlenir
 #   * BuildKit cache mount'ları servisler arası PAYLAŞILIR (id=rust-*)
 #   * runtime katmanı ortak (debian slim + ca-certificates + libssl3)
 # Kullanım (compose `args`):

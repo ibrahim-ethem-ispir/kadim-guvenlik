@@ -153,13 +153,13 @@ services:
       retries: 5
 
   # --- Auth Service (Rust) ---
-  # Tüm Rust servisleri TEK workspace'ten derlenir: context=./services,
-  # Dockerfile.rust + SERVICE/BIN argümanları. Ortak bağımlılıklar bir kez derlenir
+  # Tüm Rust servisleri TEK workspace'ten derlenir: context=./services/rust,
+  # ortak Dockerfile + SERVICE/BIN argümanları. Ortak bağımlılıklar bir kez derlenir
   # (BuildKit cache mount) — eskiden her servis tokio/axum/mongodb'yi sıfırdan derliyordu.
   auth-service:
     build:
-      context: ./services
-      dockerfile: Dockerfile.rust
+      context: ./services/rust
+      dockerfile: Dockerfile
       args:
         SERVICE: auth-service
         BIN: auth-service
@@ -307,8 +307,8 @@ services:
   # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
   recon-service:
     build:
-      context: ./services
-      dockerfile: Dockerfile.rust
+      context: ./services/rust
+      dockerfile: Dockerfile
       args:
         SERVICE: recon_service
         BIN: recon_service
@@ -330,8 +330,8 @@ services:
   # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
   osint-service:
     build:
-      context: ./services
-      dockerfile: Dockerfile.rust
+      context: ./services/rust
+      dockerfile: Dockerfile
       args:
         SERVICE: osint-service
         BIN: osint-service
@@ -361,8 +361,8 @@ services:
   hash-cracker:
     profiles: ["tools"]
     build:
-      context: ./services
-      dockerfile: Dockerfile.rust
+      context: ./services/rust
+      dockerfile: Dockerfile
       args:
         SERVICE: hash-cracker
         BIN: hash-cracker
@@ -380,8 +380,8 @@ services:
   # Otonom motor için ZORUNLU: "docker compose up" ile otomatik başlar.
   fuzz-service:
     build:
-      context: ./services
-      dockerfile: Dockerfile.rust
+      context: ./services/rust
+      dockerfile: Dockerfile
       args:
         SERVICE: fuzz-service-rs
         BIN: fuzz-service-rs
@@ -437,8 +437,8 @@ services:
   stress-service:
     profiles: ["tools"]
     build:
-      context: ./services
-      dockerfile: Dockerfile.rust
+      context: ./services/rust
+      dockerfile: Dockerfile
       args:
         SERVICE: stress-service
         BIN: stress-service
@@ -464,8 +464,8 @@ services:
   researcher-service:
     profiles: ["research"]
     build:
-      context: ./services
-      dockerfile: Dockerfile.rust
+      context: ./services/rust
+      dockerfile: Dockerfile
       args:
         SERVICE: researcher-service
         BIN: researcher-service

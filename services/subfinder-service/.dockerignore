@@ -1,0 +1,18 @@
+# Build context filtresi — `COPY . .` kullanıldığı için zorunlu.
+# Yerel geliştirme artıkları (venv, __pycache__, log, indirilen tar.gz) imaja girmesin.
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+**/node_modules
+**/*.log
+**/logs
+**/*.tar.gz
+**/*.zip
+**/*.dump
+**/.DS_Store
+**/.git
+**/target

@@ -14,7 +14,7 @@ Otonom güvenlik tarama platformu. Her araç (nmap, nuclei, subfinder, recon, os
 | `orchestrator/integrations/` | servis proxy'leri + `settings_router` + `llm_env_config.py` |
 | `services/ai-service/main.py` | LLM analiz+chat, provider routing (`analyze_with_*`) |
 | `services/<tool>-service/` | tekil tarayıcı FastAPI'leri |
-| `services/Cargo.toml` + `services/Dockerfile.rust` | 7 Rust servisinin ortak workspace'i + tek build hattı (wifi hariç) |
+| `services/rust/Cargo.toml` + `services/rust/Dockerfile` | 7 Rust servisinin ortak workspace'i + tek build hattı (wifi hariç) |
 | `frontend/app/routes/auto-scan.tsx` | otonom tarama sayfası (ana UI) |
 | `frontend/app/hooks/usePipelineStream.ts` | canlı WS akışı (reconnect+replay) |
 | `nginx/` + `docker-compose.yml` | gateway `5566:80`, mongo `27018:27017` |
@@ -65,9 +65,9 @@ docker compose up -d                 # tüm stack (UI: localhost:5566)
 docker compose logs -f orchestrator  # motor logları
 cd frontend && pnpm dev              # frontend dev (pnpm, npm DEĞİL)
 python3 orchestrator/pipeline/test_playbook.py   # test = düz script (pytest yok)
-cd services && cargo check -p auth-service        # Rust workspace (7 servis, tek Cargo.lock)
+cd services/rust && cargo check -p auth-service   # Rust workspace (7 servis, tek Cargo.lock)
 ```
-**Rust servisleri:** `services/Cargo.toml` = tek Cargo workspace (wifi hariç). Hepsi `services/Dockerfile.rust` + compose `args: {SERVICE, BIN, PORT, EXTRA_APT}` ile derlenir; servis başına Dockerfile YOK. Binlerce satırlık servis kodu `services/<servis>/src` altında, bağımlılık kilidi tek: `services/Cargo.lock`.
+**Rust servisleri:** `services/rust/Cargo.toml` = tek Cargo workspace (wifi hariç). Hepsi `services/rust/Dockerfile` + compose `args: {SERVICE, BIN, PORT, EXTRA_APT}` ile derlenir; servis başına Dockerfile YOK. Servis kodu `services/rust/<servis>/src` altında, bağımlılık kilidi tek: `services/rust/Cargo.lock`.
 Tarama başlat: `curl -X POST http://localhost:5566/api/v2/scan -H 'Content-Type: application/json' -d '{"target":"example.com","profile":"autonomous","level":"standard"}'`
 Env (`.env`): `AUTONOMOUS_MAX_STEPS/MAX_SECONDS/LLM_DISABLE/SCOPE/SEVERITY_FLOOR`; prob flag'leri (`WP_PROBE`, `IDOR_PROBE`, `COMBO_CHAINS`, `KEV_INTEL_ENABLED`, `TARGET_PROFILING`, `CAMPAIGN_LOCK(_STEPS/_FOCUS_MULT)`, `CRED_PLANE`, `PROPAGATE_PATTERNS`, `PATH_PROPOSER(_EVERY)`, ...) çoğu **varsayılan AÇIK** (getenv `"1"`/`"true"`). Operatör disiplini testi: `python3 orchestrator/pipeline/test_operator_doctrine.py`.
 

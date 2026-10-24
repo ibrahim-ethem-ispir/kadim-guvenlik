@@ -18,7 +18,7 @@ beslenir (teknoloji → CVE/nuclei tag zincirinin tetikleyicisi).
 ## Geliştirme
 
 ```bash
-cd services/recon-service
+cd services/rust/recon-service
 cargo build --release
 ```
 

@@ -1,0 +1,19 @@
+# services/rust/Dockerfile için build context filtresi (BuildKit:
+# <dockerfile>.dockerignore). Amaç: GB'larca artefakt -> kaynak boyutu (~1 MB).
+# Eskiden recon-service context'i 1.6 GB gönderiyordu (target/ dahil) ve her
+# build'de cache'i geçersiz kılıyordu. Ölçüm: 1.6 GB -> ~8.5 kB.
+**/target
+**/node_modules
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+**/*.log
+**/*.tar.gz
+**/*.zip
+**/*.dump
+**/.DS_Store
+**/.git
