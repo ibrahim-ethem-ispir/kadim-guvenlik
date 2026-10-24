@@ -1780,6 +1780,19 @@ class V2ScanRequest(BaseModel):
     # dayanıklılığını (CDN cache duruşu + rate-limit), origin-CDN-bypass ifşasını ve SSH
     # parola-auth maruz-kalmasını yoklar. Gerçek DDoS/brute-force ATILMAZ.
     resilience: bool = False
+    # Türkçe: OPERATÖR CVE SÜPÜRMESİ (acil durum yönü). Yeni çıkan kritik bir CVE'nin
+    # kimleri etkilediğini öğrenmek için sürüm ifşası BEKLENMEZ — verilen CVE id'leri
+    # motor döngüsünden önce VULNERABILITY düğümü + hedefli nuclei template kenarı olarak
+    # tohumlanır, bütün kapsam o CVE ile süpürülür. Örn: ["CVE-2026-1234"]. Boş = normal
+    # akış. Template yoksa dürüst advisory (unconfirmed) raporlanır.
+    cve_ids: Optional[List[str]] = None
+
+    @validator('cve_ids')
+    def validate_cve_ids(cls, v):
+        if v is None:
+            return v
+        from pipeline.cve_sweep import validate_cve_ids as _validate
+        return _validate(v)
 
     @validator('target_kind')
     def validate_target_kind(cls, v):
@@ -1835,6 +1848,7 @@ async def start_v2_scan(request: V2ScanRequest):
         auth_b=request.auth_b,
         target_kind=request.target_kind,
         resilience=request.resilience,
+        cve_ids=request.cve_ids,
     )
     return result
 

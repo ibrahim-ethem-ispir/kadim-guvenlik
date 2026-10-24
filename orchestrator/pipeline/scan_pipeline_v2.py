@@ -138,6 +138,12 @@ class PipelineSession:
     # L7 DoS dayanıklılığı (CDN cache duruşu + rate-limit) + origin-CDN-bypass ifşası + SSH
     # parola-auth maruz-kalması. Hepsi TAHRİBATSIZ (gerçek DDoS/brute-force YOK).
     resilience: bool = False
+    # Operatör CVE SÜPÜRMESİ (cve_sweep): acil durumda yön tersine döner — 'envanterden
+    # CVE'ye' değil 'CVE'den envantere'. Verilen CVE id'leri motor döngüsünden ÖNCE
+    # VULNERABILITY düğümü + hedefli nuclei template kenarı olarak tohumlanır; sürüm
+    # ifşası beklenmeden bütün kapsam o CVE ile süpürülür. Template yoksa dürüst advisory
+    # (unconfirmed) yazılır. Boş/None = davranış birebir eski hâl.
+    cve_ids: Optional[List[str]] = None
     status: str = "pending"  # pending, running, completed, failed, cancelled
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     started_at: Optional[str] = None
@@ -3097,6 +3103,7 @@ class ScanPipelineV2:
         auth_b: Optional[Dict[str, Any]] = None,
         target_kind: Optional[str] = None,
         resilience: bool = False,
+        cve_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Türkçe: Pipeline'ı başlat.
@@ -3128,6 +3135,7 @@ class ScanPipelineV2:
                 auth_b=auth_b,
                 target_kind=(target_kind or None),
                 resilience=bool(resilience),
+                cve_ids=(cve_ids or None),
             )
             self._active_pipelines[session_id] = session
             self._save_session(session)
@@ -3648,6 +3656,13 @@ class ScanPipelineV2:
             await self._ensure_target_profile(session, engine, dispatcher)
         except Exception as _tpe0:
             logger.debug(f"İlk hedef profili atlandı: {_tpe0}")
+        # OPERATÖR CVE SÜPÜRMESİ (cve_sweep): döngüden ÖNCE tohumla — motorun ilk
+        # kararlarında bu kenarlar zaten skorda olsun (acil CVE beklemez). Best-effort.
+        if getattr(session, "cve_ids", None):
+            try:
+                await self._seed_cve_sweep(session, engine, narrate)
+            except Exception as _cs_e:
+                logger.info(f"CVE süpürme tohumlaması atlandı (best-effort, scan={session.scan_id}): {_cs_e}")
         try:
             while engine.budget_left() and not svc_all_down:
                 # §2.5: Duraklatıldıysa YENİ hamle başlatma — resume gelene kadar bekle.
@@ -4108,6 +4123,14 @@ class ScanPipelineV2:
                     await self._propagate_verified_patterns(session, engine, narrate)
                 except Exception as _ppe:
                     logger.info(f"Desen yayılımı atlandı (best-effort, scan={session.scan_id}): {_ppe}")
+                # AKTÖR GÖZLÜĞÜ KÖPRÜSÜ: gözlüğün "sinyal var ama doğrulanmadı" (gap)
+                # dediği vektörleri hedefli nuclei TAG kenarlarına çevir — raporlamakla
+                # kalmaz, kapıyı ZORLAR. Koşum/skor/scope yine motorun. GAP_BRIDGE=0 kapatır.
+                await act("🎯 Aktör-gözlüğü köprüsü — kapsam açıkları süpürmeye dönüyor")
+                try:
+                    await self._bridge_actor_gaps(session, engine, narrate)
+                except Exception as _agb_e:
+                    logger.info(f"Aktör köprüsü atlandı (best-effort, scan={session.scan_id}): {_agb_e}")
                 # OPERATÖR PATH-PROPOSER: CONFIRMED kanıt varsa LLM'e 'sıradaki tek hamle +
                 # hedeflenen yol' sorulur; çıktı doğrulanmış graf kenarıdır (araç/host/opsiyon
                 # beyaz-listesi). Karar yine deterministik motorun. PATH_PROPOSER=0 kapatır.
@@ -4222,6 +4245,13 @@ class ScanPipelineV2:
             except Exception as _ad_e:
                 logger.debug(f"Varlık delta radarı atlandı (best-effort, scan={session.scan_id}): {_ad_e}")
 
+            # AKTÖR GÖZLÜĞÜ (SAF, sıfır istek): yüzeyi Lazarus/fidye/hacktivist/IAB
+            # playbook'larıyla oku — açık kapılar + kapsam açıkları. ACTOR_LENS=0 kapatır.
+            try:
+                await self._assess_actor_lens(session, engine, narrate)
+            except Exception as _al_e:
+                logger.debug(f"Aktör gözlüğü atlandı (best-effort, scan={session.scan_id}): {_al_e}")
+
             # Son OAST yoklaması (asenkron geciken callback'ler)
             try:
                 await self._poll_oast_callbacks(session, engine, narrate)
@@ -4238,6 +4268,8 @@ class ScanPipelineV2:
                 summary["fingerprint"] = session.ai_analysis["fingerprint"]
             if session.ai_analysis and "cve_intel" in session.ai_analysis:
                 summary["cve_intel"] = session.ai_analysis["cve_intel"]
+            if session.ai_analysis and "actor_lens" in session.ai_analysis:
+                summary["actor_lens"] = session.ai_analysis["actor_lens"]
 
             session.completed_at = datetime.utcnow().isoformat()
             session.total_duration_seconds = (datetime.utcnow() - run_start).total_seconds()
@@ -7203,6 +7235,167 @@ class ScanPipelineV2:
                 {"propagated_hosts": added, "tags": tags})
 
 
+    async def _bridge_actor_gaps(self, session: PipelineSession, engine, narrate):
+        """AKTÖR GÖZLÜGÜ KÖPRÜSÜ — "gap'i gör, kapıyı zorla".
+
+        _assess_actor_lens (finalize) yalnız RAPORLAR; bu metod döngü-içi post-observe'da
+        çalışır ve gözlüğün 'untested' dediği vektörleri (sinyal var + doğrulayan koşmadı)
+        hedefli nuclei TAG kenarlarına tohumlar → motor sonraki turlarda seçer ve koşturur.
+        Desen yayılımı (_propagate_verified_patterns) ile AYNI desen: yeni istek yok, kenar
+        tohumlama var; koşum, eşik, scope ve tag-dedup yine motorun.
+
+        Disiplin: yalnız critical/high gap'ler (SAF planı bunu zaten süzer), host başına
+        tek kenar (sigil dedup), tur başına en fazla 6 kenar. Keşif seviyesinde kapalı.
+        GAP_BRIDGE=0 kapatır. Best-effort; motoru ASLA düşürmez."""
+        if os.getenv("GAP_BRIDGE", "1") != "1":
+            return
+        if str(getattr(session, "level", "") or "").lower() == "recon":
+            return
+        from .actor_lens import assess_actor_surface, gap_sweep_plan, surface_from_graph
+        from .attack_graph import NodeType, NodeState, _canon_host
+        g = engine.graph
+        root = g.nodes.get(g.root_id)
+        if root is None:
+            return
+        plan = gap_sweep_plan(
+            assess_actor_surface(surface_from_graph(g)), str(engine.target or ""))
+        if not plan:
+            return
+        done = root.meta.setdefault("actor_gap_bridged", set())
+        base_host = _canon_host(engine.target)
+
+        def _node_for(host: str):
+            """Sinyalin taşıdığı host için graf düğümü çöz: önce meta.host eşleşmesi
+            (SERVICE düğümleri — nmap çıktısı buraya düşer), sonra kardeş HOST label'ı."""
+            for n in g.nodes.values():
+                if n.id == g.root_id:
+                    continue
+                m = getattr(n, "meta", None) or {}
+                if str(m.get("host") or "") == host:
+                    return n
+            ch = _canon_host(host)
+            if ch and ch != base_host:
+                for n in g.nodes.values():
+                    if (n.type == NodeType.HOST and n.state != NodeState.DEAD
+                            and _canon_host(str(n.label)) == ch):
+                        return n
+            return None
+
+        added = 0
+        for entry in plan:
+            tags = entry["tags"]
+            for host in entry["hosts"][:3]:
+                node = _node_for(host)
+                if node is None:
+                    continue  # grafta düğümü olmayan host'a kenar tohumlanamaz (scope kuralı)
+                sig = f"{entry['vector_id']}|{node.id}"
+                if sig in done:
+                    continue
+                done.add(sig)
+                edge = Edge(
+                    from_id=g.root_id, to_id=node.id, tool="nuclei",
+                    options={"tags": tags, "severity": list(_DEFAULT_SEVERITY)},
+                    cost=25.0, success_prob=0.35,
+                    urgency=1.4 if entry["severity"] == "critical" else 1.25,
+                    rationale=(f"Aktör gözlüğü köprüsü: '{entry['name']}' sinyali {host} üzerinde "
+                               f"görüldü ama doğrulanmadı → hedefli {','.join(tags)} süpürmesi "
+                               f"({'/'.join(entry['actors'])} playbook'u — operatör: kapıyı zorla)."),
+                    meta={"actor_gap": entry["vector_id"]},
+                )
+                if edge.key() not in g.edges:
+                    g.add_edge(edge)
+                    added += 1
+            if added >= 6:
+                break
+        if added:
+            g.notes.append(
+                f"🎯 Aktör-gözlüğü köprüsü: {added} kapsam açığı hedefli süpürme kenarına çevrildi.")
+            await narrate(
+                ScanEventType.AGENT_THINKING,
+                f"🎯 Aktör gözlüğü {added} test-dışı vektörü hedefli süpürmeye çevirdi "
+                f"(motor kuyruğunda; skor sırası motorun).",
+                {"actor_gap_edges": added,
+                 "vectors": [e["vector_id"] for e in plan[:6]]})
+
+    async def _seed_cve_sweep(self, session: PipelineSession, engine, narrate):
+        """OPERATÖR CVE SÜPÜRMESİ — 'CVE'den envantere' (acil durum yönü).
+
+        Mevcut huni 'hedef tara → sürüm bul → NVD'ye sor'dur; yeni çıkan kritik bir CVE
+        için bu huni en kritik anda çalışmaz (sürüm gizli). Operatör cve_ids verdiğinde
+        motor döngüden ÖNCE her CVE'yi VULNERABILITY düğümü + hedefli nuclei template
+        kenarı olarak tohumlar → siege_score ilk kararlardan itibaren bunları görür.
+        Koşum/scope/dedup/kanıt kademesi motorun; bu metod yalnız tohumlar.
+        Template yoksa dürüst advisory (unconfirmed) yazar — sessiz yutma yok."""
+        from .cve_sweep import advisory_finding, sweep_plan
+        from .attack_graph import (NODE_VALUE_TABLE, Node, NodeType, NodeState)
+        from .autonomous_engine import Evidence
+
+        cves = [str(c) for c in (session.cve_ids or [])]
+        if not cves:
+            return
+        # İstihbarat (best-effort, keysiz çalışır): template var mı / KEV / EPSS / PoC.
+        # Erişilemezse sweep_plan konservatif 'template yok' varsayar → advisory yazılır,
+        # kenar YİNE eklenir (template sonradan kütüphaneye gelirse süpürme çalışır).
+        intel: Dict[str, Any] = {}
+        try:
+            from .vulnx_intel import enrich_cves
+            _res = await enrich_cves(cves, max_lookups=max(12, len(cves)))
+            intel = _res.get("results") or {}
+        except Exception as _vi_e:
+            logger.debug(f"vulnx istihbaratı alınamadı (konservatif devam): {_vi_e}")
+        plan = sweep_plan(cves, intel)
+        g = engine.graph
+        if g.nodes.get(g.root_id) is None:
+            return
+        seeded = 0
+        advisories = 0
+        for item in plan:
+            cve = item["cve"]
+            nid = f"vuln:sweep:{cve}"
+            if nid in g.nodes:
+                continue  # aynı CVE yeniden tohumlanmaz (ör. tarama yeniden başlatıldı)
+            g.add_node(Node(
+                id=nid, type=NodeType.VULNERABILITY, label=cve,
+                value=NODE_VALUE_TABLE["critical-cve-service"],
+                breach_prob=0.9 if item["is_kev"] else 0.75,
+                state=NodeState.DISCOVERED,
+                meta={"cves": [cve], "source": "operator_cve_sweep",
+                      "is_kev": item["is_kev"], "has_template": item["has_template"],
+                      "severity": item["severity"], "cvss": item["cvss"],
+                      "epss": item["epss"]}))
+            g.add_edge(Edge(
+                from_id=g.root_id, to_id=nid, tool="nuclei",
+                options={"templates": [item["template"]],
+                         "severity": ["critical", "high", "medium", "low", "info"]},
+                cost=20.0, success_prob=0.6,
+                urgency=1.6 if item["is_kev"] else 1.4,
+                rationale=(f"Operatör CVE süpürmesi: {cve}"
+                           + (" [CISA KEV — aktif sömürü]" if item["is_kev"] else "")
+                           + " — sürüm beklemeden hedefli template ile KANITLA.")))
+            seeded += 1
+            if not item["has_template"]:
+                adv = advisory_finding(item, str(engine.target or session.target))
+                g.add_evidence(Evidence(
+                    title=adv["title"], severity=adv["severity"], cve=adv["cve"],
+                    target=adv["target"], proof=adv["proof"], tool=adv["tool"], step=0,
+                    confidence_tier=adv["confidence_tier"],
+                    verification_detail=("Operatör süpürme talebi; nuclei template'i "
+                                         "yayımlandığında otomatik doğrulanacak."),
+                ), f"cve_sweep|{cve}")
+                advisories += 1
+        if seeded:
+            g.notes.append(
+                f"🎯 Operatör CVE süpürmesi: {seeded} CVE grafa tohumlandı "
+                f"({advisories} tanesi template'siz — advisory olarak manuel triyajda).")
+            await narrate(
+                ScanEventType.AGENT_OBSERVATION,
+                f"🎯 Operatör CVE süpürmesi aktif: {seeded} CVE hedefli template kenarıyla "
+                f"grafa tohumlandı"
+                + (f" — ⚠️ {advisories} CVE için nuclei template'i henüz yok "
+                   f"(advisory yazıldı, manuel triyaj)" if advisories else ""),
+                {"cve_sweep": {"seeded": seeded, "advisories": advisories,
+                               "cves": [i["cve"] for i in plan]}})
+
     async def _synthesize_combinations(self, session: PipelineSession, engine, narrate):
         """APT doktrini — KOMBİNASYON KENARLARI. Tek başına düşük CONFIRMED bulguları birleştirip
         yüksek-etki saldırı yüzeyi türet (combo_chains SAF kural motoru). APT'lerin tarayıcıdan
@@ -7821,6 +8014,46 @@ class ScanPipelineV2:
             msg += (f" — ⚠️ RATE LIMIT: {len(rl)} CVE bakılacaktı ama bakılamadı "
                     f"(ücretsiz PDCP anahtarı ile limit kalkar)")
         await narrate(ScanEventType.AGENT_OBSERVATION, msg, {"cve_intel": intel})
+
+    async def _assess_actor_lens(self, session: PipelineSession, engine, narrate):
+        """AKTÖR GÖZLÜĞÜ: toplanmış yüzeyi tehdit-aktör playbook'ları (Lazarus / fidye
+        yazılımı ekibi / hacktivist / IAB) üzerinden okur. "Bu yüzeye binsalar hangi
+        kapıdan girerlerdi, ben o kapıyı test ettim mi?" sorusunu yanıtlar.
+
+        NEDEN: kontroller parça parça vardı (.env, ESXi, k8s...) ama kimse SONUÇLARI
+        aktör kampanyası gözüyle birleştirip KAPSAM AÇIĞI (gap) hesaplamıyordu.
+        SAF + sıfır ek istek: yalnız grafın halihazırda bildiğini okur, yeni Evidence
+        YAZMAZ (çift sayma yok) — çıktı ai_analysis['actor_lens'] üzerinden UI/rapora
+        gider. ACTOR_LENS=0 kapatır. Best-effort; motoru ASLA düşürmez."""
+        if os.getenv("ACTOR_LENS", "1") != "1":
+            return
+        try:
+            from .actor_lens import assess_actor_surface, surface_from_graph
+        except Exception:
+            return
+        result = assess_actor_surface(surface_from_graph(engine.graph))
+        if session.ai_analysis is None:
+            session.ai_analysis = {}
+        session.ai_analysis["actor_lens"] = result
+
+        # Operatöre İKİ satırlik dürüst özet: kaç kapı AÇIK, kaç vektör TESTSİZ kaldı.
+        # Gap "açık var" demek DEĞİL — "kapsamda delik var" demek; bu yüzden WARNING
+        # değil gözlem olarak akar, ama sessiz de kalmaz (doktrin: sessiz yutma yok).
+        parts = []
+        for akey, a in result["actors"].items():
+            if a["doors"] or a["gaps"]:
+                top = a["doors"][0]["name"] if a["doors"] else ""
+                parts.append(
+                    f"{akey}: {len(a['doors'])} kapı"
+                    + (f" (ilki: {top})" if top else "")
+                    + f", {len(a['gaps'])} test-dışı vektör"
+                )
+        msg = ("🎯 Aktör gözlüğü — " + " | ".join(parts)) if parts else \
+              "🎯 Aktör gözlüğü — hiçbir aktör playbook'unda açık kapı/test-dışı vektör yok"
+        if result["gaps_total"]:
+            msg += (f" ⚠️ {result['gaps_total']} vektör sinyali olup DOĞRULANMADI "
+                    f"(kapsam açığı — ayrıntı ai_analysis.actor_lens)")
+        await narrate(ScanEventType.AGENT_OBSERVATION, msg, {"actor_lens": result})
 
     async def _record_asset_diff(self, session: PipelineSession, engine, dispatcher, narrate):
         """PORT & SERVİS VARLIK ENVANTERİ DELTA RADARI: Önceki tarama ile bu tarama arasındaki
