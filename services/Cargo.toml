@@ -1,0 +1,32 @@
+# =============================================================================
+# Kadim Güvenlik — Rust servisleri TEK Cargo workspace
+# =============================================================================
+# Neden: 7 Rust servisi ayrı ayrı derlenince aynı crate'ler (tokio, axum, serde,
+# tracing ...) her servis için yeniden derleniyordu. Tek workspace = tek
+# Cargo.lock + tek target dizini + derleme önbelleğinin servisler arası paylaşımı.
+# Docker tarafında `services/Dockerfile.rust` bu kökü kullanır (bkz. compose).
+#
+# wifi-service BİLİNÇLİ OLARAK dışarıda: actix-web + Kali taban + aircrack-ng
+# bağımlılığı var, ortak bağımlılık grafiği paylaşmıyor (bkz. exclude).
+# =============================================================================
+[workspace]
+resolver = "2"
+members = [
+  "auth-service",
+  "fuzz-service-rs",
+  "hash-cracker",
+  "osint-service",
+  "recon-service",
+  "researcher-service",
+  "stress-service",
+]
+exclude = ["wifi-service"]
+
+# Tek merkezî release profili — üyelerin kendi [profile.release] bölümü YOK
+# sayılır (Cargo kök olmayan paketlerde profili yok sayar). Eski osint/researcher
+# ayarları (lto + codegen-units=1 + strip) buraya taşındı.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

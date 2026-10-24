@@ -53,8 +53,5 @@ jsonwebtoken = "9"
 # IP/Network utils
 ipnetwork = "0.20"
 
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-strip = true
+# NOT: [profile.release] workspace köküne taşındı (services/Cargo.toml).
+# Cargo, workspace ÜYELERİNDE yerel profili yok sayar — ayar tek yerde olmalı.

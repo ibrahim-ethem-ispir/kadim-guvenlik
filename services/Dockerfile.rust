@@ -1,0 +1,82 @@
+# syntax=docker/dockerfile:1.7
+# =============================================================================
+# Kadim Güvenlik — TEK Rust build hattı (Cargo workspace)
+# =============================================================================
+# Neden tek Dockerfile: 7 Rust servisi aynı crate ağacını (tokio, axum, serde,
+# mongodb, reqwest, tracing ...) ayrı ayrı derliyordu. Burada:
+#   * build context = services/ (workspace kökü), bağımlılıklar TEK kez derlenir
+#   * BuildKit cache mount'ları servisler arası PAYLAŞILIR (id=rust-*)
+#   * runtime katmanı ortak (debian slim + ca-certificates + libssl3)
+# Kullanım (compose `args`):
+#   SERVICE=<workspace paket adı>  BIN=<üretilen binary adı>
+#   PORT=<dinlenen port>           EXTRA_APT="boşlukla ayrılmış ek paketler"
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: build
+# -----------------------------------------------------------------------------
+FROM rust:1.91-bookworm AS builder
+
+ARG SERVICE
+ARG BIN
+
+WORKDIR /app
+
+# OpenSSL başlıkları mongodb (native-tls) + ssh2 için gerekli
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Workspace'in TAMAMI (Cargo.lock + tüm üye manifestleri) — kaynak toplamı küçük,
+# asıl ağırlık target/ ve cache mount'larda; .dockerignore target'ı dışlar.
+COPY . .
+
+# feroxbuster yalnız fuzz servisinde gerekli; kendi cache mount'unda derlenir ki
+# diğer servislerin build'i bu maliyeti ödemesin ve rebuild'de tekrar derlenmesin.
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=rust-cargo-registry \
+    --mount=type=cache,target=/usr/local/cargo/git,id=rust-cargo-git \
+    --mount=type=cache,target=/tmp/ferox-target,id=rust-ferox-target \
+    mkdir -p /ferox/bin /out \
+    && if [ "$SERVICE" = "fuzz-service-rs" ]; then \
+         cargo install feroxbuster --version 2.13.1 --locked \
+             --root /ferox --target-dir /tmp/ferox-target; \
+       fi
+
+# Tek paket derlenir; cache mount sayesinde ortak crate'ler ikinci build'de
+# sıfırdan derlenmez. Binary cache mount içinden /out'a kopyalanır (mount katmana
+# yazılmaz, yoksa cache her build'de devasa layer üretirdi).
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=rust-cargo-registry \
+    --mount=type=cache,target=/usr/local/cargo/git,id=rust-cargo-git \
+    --mount=type=cache,target=/app/target,id=rust-target \
+    cargo build --release -p "$SERVICE" \
+    && install -m 0755 "/app/target/release/$BIN" /out/service
+
+# -----------------------------------------------------------------------------
+# Stage 2: runtime
+# -----------------------------------------------------------------------------
+FROM debian:bookworm-slim AS runtime
+
+ARG PORT=8080
+# Servise özel runtime araçları (hash-cracker: john/7zip/poppler, researcher: chromium ...)
+ARG EXTRA_APT=""
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates libssl3 \
+        ${EXTRA_APT} \
+    && rm -rf /var/lib/apt/lists/*
+
+# Servislerin yazdığı dizinler (recon-log volume'u, fuzz wordlist/çıktıları)
+RUN mkdir -p /app/log /app/files
+
+WORKDIR /app
+
+COPY --from=builder /out/service /usr/local/bin/service
+# fuzz dışındaki servislerde boş kalır (COPY boş dizinde de çalışır)
+COPY --from=builder /ferox/bin/ /usr/local/bin/
+
+ENV RUST_LOG=info \
+    PORT=${PORT}
+
+EXPOSE ${PORT}
+
+ENTRYPOINT ["/usr/local/bin/service"]

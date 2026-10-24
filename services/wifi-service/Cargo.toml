@@ -1,3 +1,8 @@
+# Bu paket kendi workspace köküdür: services/ kökündeki ortak workspace'ten
+# BİLİNÇLİ olarak hariç (Kali base + actix-web, ortak bağımlılık grafiği yok).
+# Aksi halde kendi Docker context'inden derlenirken "workspace bulunamadı" hatası verir.
+[workspace]
+
 [package]
 name = "wifi-service"
 version = "0.1.0"
